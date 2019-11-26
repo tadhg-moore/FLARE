@@ -83,6 +83,9 @@ run_EnKF <- function(x,
       if(npars > 0){
         curr_pars <- x[i - 1, m , (nstates+1):(nstates+npars)]
       }
+      
+      #Remove double backslash in windows
+      curr_met_file <- gsub("\\", "/", curr_met_file, fixed = T)
      
       ########################################
       #BEGIN GLM SPECIFIC PART

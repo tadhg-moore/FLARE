@@ -397,8 +397,8 @@ run_flare<-function(start_day_local,
   ####################################################
   
   met_file_names <- rep(NA, 1+(n_met_members*n_ds_members))
-  obs_met_outfile <- paste0(working_directory, "/", "GLM_met.csv")
-  create_obs_met_input(fname = met_obs_fname_wdir,
+  obs_met_outfile <- paste0(working_directory, "/", "GLM_met.csv") #Missing extra file
+  create_obs_met_input(fname = met_obs_fname_wdir[1], #Need to be different for Feeagh
                        outfile=obs_met_outfile,
                        full_time_hour_local, 
                        input_file_tz = "EST5EDT",
@@ -452,7 +452,7 @@ run_flare<-function(start_day_local,
     
     met_file_names[2:(1+(n_met_members*n_ds_members))] <- process_downscale_GEFS(folder = code_folder,
                                                                                  noaa_location,
-                                                                                 input_met_file = met_obs_fname_wdir[1],
+                                                                                 input_met_file = "C:\\Users\\mooret\\Desktop\\flare_feeagh\\feeagh_data\\met"#met_obs_fname_wdir[1],
                                                                                  working_directory,
                                                                                  sim_files_folder = paste0(code_folder, "/", "sim_files"),
                                                                                  n_ds_members,
@@ -498,12 +498,12 @@ run_flare<-function(start_day_local,
                              inflow2 = inflow_outflow_files$wetland_file_names)
   outflow_file_names <- cbind(inflow_outflow_files$spillway_file_names)
   
-  management_input <- read_sss_files(full_time_day_local,
-                                     working_directory,
-                                     input_file_tz = 'EST5EDT', 
-                                     sss_file = "Calc_HOX_flow_DO_20190320.csv",
-                                     local_tzone)
-  
+  # management_input <- read_sss_files(full_time_day_local,
+  #                                    working_directory,
+  #                                    input_file_tz = 'EST5EDT', 
+  #                                    sss_file = "Calc_HOX_flow_DO_20190320.csv",
+  #                                    local_tzone)
+  # 
   
   ####################################################
   #### STEP 6: PROCESS AND ORGANIZE STATE DATA
@@ -515,7 +515,7 @@ run_flare<-function(start_day_local,
   #Extract observations, 
   temp_obs_fname_wdir <- paste0(working_directory, "/", temp_obs_fname)
   #PROCESS TEMPERATURE OBSERVATIONS
-  obs_temp <- extract_temp_chain(fname = temp_obs_fname_wdir,
+  obs_temp <- extract_temp_chain(fname = temp_obs_fname_wdir[1],
                                  full_time_local,
                                  modeled_depths = modeled_depths,
                                  observed_depths_temp = observed_depths_temp,
@@ -523,34 +523,34 @@ run_flare<-function(start_day_local,
                                  local_tzone)
   
   #PROCESS DO OBSERVATIONS
-  obs_do <- extract_do_chain(fname = temp_obs_fname_wdir,
-                             full_time_local,
-                             modeled_depths = modeled_depths,
-                             observed_depths_do= observed_depths_do,
-                             input_file_tz = "EST5EDT", 
-                             local_tzone)
-  
-  obs_chla <- extract_chla_chain(fname = temp_obs_fname_wdir,
-                                 full_time_local,
-                                 modeled_depths = modeled_depths,
-                                 observed_depths_chla_fdom,
-                                 input_file_tz = "EST5EDT", 
-                                 local_tzone)
-  
-  obs_fdom <- extract_do_chain(fname = temp_obs_fname_wdir,
-                               full_time_local,
-                               modeled_depths = modeled_depths,
-                               observed_depths_chla_fdom,
-                               input_file_tz = "EST5EDT", 
-                               local_tzone)
-  
-  #obs_fdom$obs[, ] <- NA
-  
-  obs_nutrients <- extract_nutrients(fname = paste0(data_location,"/extra_files/chemistry.csv"),
-                                     full_time_day_local,
-                                     modeled_depths = modeled_depths,
-                                     input_file_tz = "EST5EDT", 
-                                     local_tzone)
+  # obs_do <- extract_do_chain(fname = temp_obs_fname_wdir[1],
+  #                            full_time_local,
+  #                            modeled_depths = modeled_depths,
+  #                            observed_depths_do= observed_depths_do,
+  #                            input_file_tz = "EST5EDT", 
+  #                            local_tzone)
+  # 
+  # obs_chla <- extract_chla_chain(fname = temp_obs_fname_wdir[1],
+  #                                full_time_local,
+  #                                modeled_depths = modeled_depths,
+  #                                observed_depths_chla_fdom,
+  #                                input_file_tz = "EST5EDT", 
+  #                                local_tzone)
+  # 
+  # obs_fdom <- extract_do_chain(fname = temp_obs_fname_wdir[1],
+  #                              full_time_local,
+  #                              modeled_depths = modeled_depths,
+  #                              observed_depths_chla_fdom,
+  #                              input_file_tz = "EST5EDT", 
+  #                              local_tzone)
+  # 
+  # #obs_fdom$obs[, ] <- NA
+  # 
+  # obs_nutrients <- extract_nutrients(fname = paste0(data_location,"/extra_files/chemistry.csv"),
+  #                                    full_time_day_local,
+  #                                    modeled_depths = modeled_depths,
+  #                                    input_file_tz = "EST5EDT", 
+  #                                    local_tzone)
   
   #Combine fdom and nutrients
   for(i in 1:length(full_time_day_local)){
@@ -647,23 +647,23 @@ run_flare<-function(start_day_local,
   init_temps_obs <- obs_temp$obs[1, which(!is.na(obs_temp$obs[1, ]))]
   init_obs_temp_depths <- modeled_depths[which(!is.na(obs_temp$obs[1, ]))]
   
-  init_do_obs <- obs_do$obs[1, which(!is.na(obs_do$obs[1, ]))]
-  init_obs_do_depths <- modeled_depths[which(!is.na(obs_do$obs[1, ]))]
-  
-  init_chla_obs <- obs_chla$obs[1, which(!is.na(obs_chla$obs[1, ]))]
-  init_chla_obs_depths <- modeled_depths[which(!is.na(obs_chla$obs[1, ]))]
-  
-  init_doc_obs <- obs_fdom$obs[1, which(!is.na(obs_fdom$obs[1, ]))]
-  init_doc_obs_depths <- modeled_depths[which(!is.na(obs_fdom$obs[1, ]))]
-  
-  init_nit_amm_obs <- obs_nutrients$NH4[1, which(!is.na(obs_nutrients$NH4[1, ]))]
-  init_nit_amm_obs_depths <- modeled_depths[which(!is.na(obs_nutrients$NH4[1, ]))]
-  
-  init_nit_nit_obs <- obs_nutrients$NO3[1, which(!is.na(obs_nutrients$NO3[1, ]))]
-  init_nit_nit_obs_depths <- modeled_depths[which(!is.na(obs_nutrients$NO3[1, ]))]
-  
-  init_phs_frp_obs <- obs_nutrients$SRP[1, which(!is.na(obs_nutrients$SRP[1, ]))]
-  init_phs_frp_obs_depths <- modeled_depths[which(!is.na(obs_nutrients$SRP[1, ]))]
+  # init_do_obs <- obs_do$obs[1, which(!is.na(obs_do$obs[1, ]))]
+  # init_obs_do_depths <- modeled_depths[which(!is.na(obs_do$obs[1, ]))]
+  # 
+  # init_chla_obs <- obs_chla$obs[1, which(!is.na(obs_chla$obs[1, ]))]
+  # init_chla_obs_depths <- modeled_depths[which(!is.na(obs_chla$obs[1, ]))]
+  # 
+  # init_doc_obs <- obs_fdom$obs[1, which(!is.na(obs_fdom$obs[1, ]))]
+  # init_doc_obs_depths <- modeled_depths[which(!is.na(obs_fdom$obs[1, ]))]
+  # 
+  # init_nit_amm_obs <- obs_nutrients$NH4[1, which(!is.na(obs_nutrients$NH4[1, ]))]
+  # init_nit_amm_obs_depths <- modeled_depths[which(!is.na(obs_nutrients$NH4[1, ]))]
+  # 
+  # init_nit_nit_obs <- obs_nutrients$NO3[1, which(!is.na(obs_nutrients$NO3[1, ]))]
+  # init_nit_nit_obs_depths <- modeled_depths[which(!is.na(obs_nutrients$NO3[1, ]))]
+  # 
+  # init_phs_frp_obs <- obs_nutrients$SRP[1, which(!is.na(obs_nutrients$SRP[1, ]))]
+  # init_phs_frp_obs_depths <- modeled_depths[which(!is.na(obs_nutrients$SRP[1, ]))]
   
   
   #OGM_doc_init_depth <- NA
