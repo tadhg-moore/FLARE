@@ -32,9 +32,9 @@ restart_file <- NA
 forecast_days <- 16
 spin_up_days <- 0
 sim_name <- "test1_woaed" 
-start_day_local <- "2018-08-16"  #Note: 2018-07-16 is the first day with CTD observations for initial conditions
+start_day_local <- "2019-05-05"  #Note: 2018-07-16 is the first day with CTD observations for initial conditions
 start_time_local <- "13:00:00"
-forecast_start_day_local <- "2018-10-01" 
+forecast_start_day_local <- "2019-05-10" 
 
 start_day_local <- as.POSIXct(start_day_local, format = "%Y-%m-%d")
 forecast_start_day_local <- as.POSIXct(forecast_start_day_local, format = "%Y-%m-%d")
