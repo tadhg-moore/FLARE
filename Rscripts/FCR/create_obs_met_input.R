@@ -96,13 +96,13 @@ create_obs_met_input <- function(fname,
     #full_time_hour_local <- full_time_hour_local[remove_hours]
     
     
-    ShortWave <- na.interpolation(ShortWave, option = "linear")
-    LongWave <- na.interpolation(LongWave, option = "linear")
-    AirTemp <- na.interpolation(AirTemp, option = "linear")
-    RelHum <- na.interpolation(RelHum, option = "linear")
-    WindSpeed <- na.interpolation(WindSpeed, option = "linear")
-    Rain <- na.interpolation(Rain, option = "linear")        
-    Snow <- na.interpolation(Snow, option = "linear")      
+    ShortWave <- na_interpolation(ShortWave, option = "linear")
+    LongWave <- na_interpolation(LongWave, option = "linear")
+    AirTemp <- na_interpolation(AirTemp, option = "linear")
+    RelHum <- na_interpolation(RelHum, option = "linear")
+    WindSpeed <- na_interpolation(WindSpeed, option = "linear")
+    Rain <- na_interpolation(Rain, option = "linear")        
+    Snow <- na_interpolation(Snow, option = "linear")      
     
     historical_met <- data.frame(full_time_hour_local,
                                  ShortWave,
