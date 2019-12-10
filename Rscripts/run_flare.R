@@ -217,6 +217,7 @@ run_flare<-function(start_day_local,
   temperature_location <- paste0(data_location, "/", "mia-data") #FCR SPECIFIC
   met_station_location <- paste0(data_location, "/", "carina-data") #FCR SPECIFIC
   noaa_location <- paste0(data_location, "/", "noaa-data") #FCR SPECIFIC
+  noaa_location <- "C:\\Users\\mooret\\Desktop\\flare_feeagh\\feeagh_data\\noaa_data" # Added for Feeagh data
   if(pull_from_git){
     
     if(!file.exists(temperature_location)){
@@ -452,7 +453,7 @@ run_flare<-function(start_day_local,
     
     met_file_names[2:(1+(n_met_members*n_ds_members))] <- process_downscale_GEFS(folder = code_folder,
                                                                                  noaa_location,
-                                                                                 input_met_file = "C:\\Users\\mooret\\Desktop\\flare_feeagh\\feeagh_data\\met"#met_obs_fname_wdir[1],
+                                                                                 input_met_file = "C:\\Users\\mooret\\Desktop\\flare_feeagh\\feeagh_data\\met/GLM_met_obs.csv",#met_obs_fname_wdir[1],
                                                                                  working_directory,
                                                                                  sim_files_folder = paste0(code_folder, "/", "sim_files"),
                                                                                  n_ds_members,
@@ -471,7 +472,7 @@ run_flare<-function(start_day_local,
                                                                                  last_obs_date = met_ds_obs_end,
                                                                                  input_met_file_tz = "EST5EDT")
     
-    if(weather_uncertainty == FALSE & met_downscale_uncertainty == TRUE){
+     if(weather_uncertainty == FALSE & met_downscale_uncertainty == TRUE){
       met_file_names <- met_file_names[1:(1+(1*n_ds_members))]
     }else if(weather_uncertainty == FALSE & met_downscale_uncertainty == FALSE){
       met_file_names <- met_file_names[1:2]
@@ -553,11 +554,11 @@ run_flare<-function(start_day_local,
   #                                    local_tzone)
   
   #Combine fdom and nutrients
-  for(i in 1:length(full_time_day_local)){
-    if(length(which(!is.na(obs_nutrients$DOC[i,]))) > 0){
-      obs_fdom$obs[i,which(is.na(obs_fdom$obs[i,]))] <- obs_nutrients$DOC[i,which(is.na(obs_fdom$obs[i,]))]
-    }
-  }
+  # for(i in 1:length(full_time_day_local)){
+  #   if(length(which(!is.na(obs_nutrients$DOC[i,]))) > 0){
+  #     obs_fdom$obs[i,which(is.na(obs_fdom$obs[i,]))] <- obs_nutrients$DOC[i,which(is.na(obs_fdom$obs[i,]))]
+  #   }
+  # }
   
   #Use the CTD observation rather than the sensor string when CTD data is avialable
   if(use_ctd){
