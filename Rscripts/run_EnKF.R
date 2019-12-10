@@ -26,13 +26,23 @@ run_EnKF <- function(x,
                      inflow_file_names,
                      outflow_file_names,
                      management_input,
-                     forecast_sss_on){
+                     forecast_sss_on,
+                     snow_ice_thickness,
+                     avg_surf_temp,
+                     running_residuals,
+                     the_sals_init,
+                     mixing_vars){
   
   nsteps <- length(full_time_local)
   nmembers <- dim(x)[2]
   n_met_members <- length(met_file_names) - 1
   nstates <- dim(x)[3] - npars
-  num_wq_vars <- length(wq_start)
+  ndepths_modeled <- length(modeled_depths)
+  
+  if(include_wq){
+    num_wq_vars <- length(wq_start)
+    num_phytos <- length(tchla_components_vars)
+  }
   
   full_time_day_local <- strftime(full_time_local,
                                   format="%Y-%m-%d",
@@ -40,6 +50,9 @@ run_EnKF <- function(x,
   
   x_prior <- array(NA, dim = c(nsteps, nmembers, nstates + npars))
   
+  
+  old_DYLD_LIBRARY_PATH <- Sys.getenv("DYLD_FALLBACK_LIBRARY_PATH")
+  Sys.setenv(DYLD_FALLBACK_LIBRARY_PATH = paste(old_DYLD_LIBRARY_PATH, working_directory, sep = ":"))
   ###START EnKF
   
   for(i in 2:nsteps){
@@ -57,6 +70,10 @@ run_EnKF <- function(x,
     x_star <- array(NA, dim = c(nmembers, nstates))
     x_corr <- array(NA, dim = c(nmembers, nstates))
     
+    if(include_wq){
+      phyto_groups_star <-  array(NA, dim = c(nmembers, length(modeled_depths), num_phytos))
+    }
+    
     #Matrix to store calculated ensemble specific deviations and innovations
     dit <- array(NA, dim = c(nmembers, nstates))
     dit_combined <- array(NA, dim = c(nmembers, nstates + npars))
@@ -68,8 +85,23 @@ run_EnKF <- function(x,
     
     nqt <- rmvnorm(n = nmembers, sigma = as.matrix(qt)) 
     if(npars > 0){
-      pqt <- nqt[, (nstates+1):(nstates+npars)]
+      if(i > (hist_days + 1) && parameter_uncertainty == FALSE){
+        pqt <- rep(0, length(nqt[, (nstates+1):(nstates+npars)]))
+      }else{
+        pqt <- nqt[, (nstates+1):(nstates+npars)] 
+      }
     }
+    
+    mixing_restart_variables <- c("dep_mx_init","prev_thick_init", "g_prime_two_layer_init", "energy_avail_max_init", "mass_epi_init", 
+                                  "old_slope_init", "time_end_shear_init", "time_start_shear_init", "time_count_end_shear_init", "time_count_sim_init", 
+                                  "half_seiche_period_init", "thermocline_height_init", "f0_init", "fsum_init", "u_f_init", "u0_init", "u_avg_init")
+    
+    for(v in 1:length(mixing_restart_variables)){
+      update_var(mean(mixing_vars[ ,v]), mixing_restart_variables[v], working_directory, "glm3.nml") 
+    }
+    
+    update_var(curr_start, "start", working_directory, "glm3.nml")
+    update_var(curr_stop, "stop", working_directory, "glm3.nml")
     
     # Start loop through ensemble members
     for(m in 1:nmembers){
@@ -96,44 +128,85 @@ run_EnKF <- function(x,
       # RETURNS;
       # x_star[m, ], 
       
+    update_glm_nml_list <- list()
+    update_aed_nml_list <- list()
+    update_glm_nml_names <- c()
+    update_aed_nml_names <- c()
+    list_index <- 1
+    
       if(npars > 0){
-      
+        
         sed_temp_mean_index <- which(par_names == "sed_temp_mean")
         non_sed_temp_mean_index <- which(par_names != "sed_temp_mean")
         if(length(sed_temp_mean_index) == 1){
-          update_var(c(curr_pars[sed_temp_mean_index],zone2_temp_init_mean),
-                     par_names[sed_temp_mean_index],
-                     working_directory, par_nml[sed_temp_mean_index])
+          update_glm_nml_list[[list_index]] <-  c(curr_pars[sed_temp_mean_index],zone2_temp_init_mean) 
+          update_glm_nml_names[list_index] <- "sed_temp_mean"
+          list_index <- list_index + 1
+        
         }else if(length(sed_temp_mean_index) == 2){
-          update_var(c(curr_pars[sed_temp_mean_index[1]],curr_pars[sed_temp_mean_index[2]]),
-                     par_names[sed_temp_mean_index[1]],
-                     working_directory, par_nml[sed_temp_mean_index[1]])
+          update_glm_nml_list[[list_index]] <-  c(curr_pars[sed_temp_mean_index[1]],curr_pars[sed_temp_mean_index[2]])
+          update_glm_nml_names[list_index] <- "sed_temp_mean"
+          list_index <- list_index + 1
+          
         }else if(length(sed_temp_mean_index) > 2){
           stop(paste0("Too many sediment temperature zones"))
         }
         
         if(length(non_sed_temp_mean_index) > 0){
           for(par in non_sed_temp_mean_index){
-            update_var(curr_pars[par], par_names[par], working_directory, par_nml[par])
+            if(par_nml[par] == "glm3.nml"){
+            update_glm_nml_list[[list_index]] <- (curr_pars[par])
+            update_glm_nml_names[list_index] <- par_names[par]
+            list_index <- list_index + 1
+            }else{
+              update_var(curr_pars[par], par_names[par], working_directory, par_nml[par])
+            }
           }
         }
       }
       
       if(include_wq){
-        wq_init_vals <- round(c(x[i - 1, m, wq_start[1]:wq_end[num_wq_vars]]), 3)
-        update_var(wq_init_vals, "wq_init_vals" ,working_directory, "glm3.nml")
+        non_tchla_states <- c(wq_start[1]:wq_end[16])
+        wq_init_vals <- round(c(x[i - 1, m, non_tchla_states], x_phyto_groups[i-1,m ,]), 3)
+        update_glm_nml_list[[list_index]] <- wq_init_vals
+        update_glm_nml_names[list_index] <- "wq_init_vals"
+        list_index <- list_index + 1
         
         if(simulate_SSS){
           create_sss_input_output(x, i, m, full_time_day_local, working_directory, wq_start, management_input, hist_days, forecast_sss_on)
         }
       }
       
-      update_var(round(x[i - 1, m, 1:length(modeled_depths)], 3), "the_temps", working_directory, "glm3.nml")
-      update_var(surface_height[i - 1, m], "lake_depth", working_directory, "glm3.nml") 
+      update_glm_nml_list[[list_index]] <- round(x[i - 1, m, 1:length(modeled_depths)], 3)
+      update_glm_nml_names[list_index] <- "the_temps"
+      list_index <- list_index + 1
+      
+      update_glm_nml_list[[list_index]] <- surface_height[i - 1, m]
+      update_glm_nml_names[list_index] <- "lake_depth"
+      list_index <- list_index + 1
+      
+      update_glm_nml_list[[list_index]] <- 0.0
+      update_glm_nml_names[list_index] <- "snow_thickness"
+      list_index <- list_index + 1
+      
+      update_glm_nml_list[[list_index]] <- snow_ice_thickness[i - 1, m, 2]
+      update_glm_nml_names[list_index] <- "white_ice_thickness"
+      list_index <- list_index + 1
+      
+      update_glm_nml_list[[list_index]] <- snow_ice_thickness[i - 1, m, 3]
+      update_glm_nml_names[list_index] <- "blue_ice_thickness"
+      list_index <- list_index + 1
+      
+      update_glm_nml_list[[list_index]] <- avg_surf_temp[i - 1, m]
+      update_glm_nml_names[list_index] <- "avg_surf_temp"
+      list_index <- list_index + 1
+
       
       #ALLOWS THE LOOPING THROUGH NOAA ENSEMBLES
       
-      update_var(curr_met_file, "meteo_fl", working_directory, "glm3.nml")
+      update_glm_nml_list[[list_index]] <- curr_met_file
+      update_glm_nml_names[list_index] <- "meteo_fl"
+      list_index <- list_index + 1
       
       if(n_inflow_outflow_members == 1){
         tmp <- file.copy(from = inflow_file_names[1], to = "inflow_file1.csv", overwrite = TRUE)
@@ -145,13 +218,16 @@ run_EnKF <- function(x,
         tmp <- file.copy(from = outflow_file_names[inflow_outflow_index], to = "outflow_file1.csv", overwrite = TRUE)      
       }
       
-      update_time(start_value  = curr_start, stop_value = curr_stop, working_directory)
       
+      update_nml(update_glm_nml_list, update_glm_nml_names, working_directory, "glm3.nml")
       #Use GLM NML files to run GLM for a day
       # Only allow simulations without NaN values in the output to proceed. 
       #Necessary due to random Nan in AED output
       pass <- FALSE
       num_reruns <- 0
+      
+      #Sys.setenv(DYLD_LIBRARY_PATH="/opt/intel/lib")
+      #Sys.setenv(DYLD_LIBRARY_PATH=working_directory)
       
       while(!pass){
         unlink(paste0(working_directory, "/output.nc")) 
@@ -170,13 +246,31 @@ run_EnKF <- function(x,
           
           if(length(ncvar_get(nc, "time")) > 1){
             nc_close(nc)
+            
+            if(include_wq){
+              output_vars <- c(glm_output_vars, tchla_components_vars)
+            }else{
+              output_vars <- c(glm_output_vars)
+            }
             GLM_temp_wq_out <- get_glm_nc_var_all_wq(ncFile = "/output.nc",
                                                      working_dir = working_directory,
                                                      z_out = modeled_depths,
-                                                     vars = glm_output_vars)
-            x_star[m, 1:nstates] <- GLM_temp_wq_out$output
+                                                     vars = output_vars)
+            
+            x_star[m, 1:nstates] <- round(c(GLM_temp_wq_out$output)[1:nstates], 3)
             
             surface_height[i, m] <- round(GLM_temp_wq_out$surface_height, 3) 
+            
+            snow_ice_thickness[i, m, ] <- round(GLM_temp_wq_out$snow_wice_bice, 3)
+            
+            avg_surf_temp[i, m] <- round(GLM_temp_wq_out$avg_surf_temp, 3)
+            
+            mixing_vars[m, ] <- GLM_temp_wq_out$mixing_vars
+            
+            if(include_wq){
+              phyto_groups_star[m, , ] <- round(GLM_temp_wq_out$output[ , (length(glm_output_vars) + 1): (length(glm_output_vars)+ num_phytos)], 3)
+            }
+            
             if(length(which(is.na(x_star[m, ]))) == 0){
               pass = TRUE
             }else{
@@ -228,12 +322,24 @@ run_EnKF <- function(x,
           replace_index <- sample(good_index, 1)
           x_star[m, ] <- x_star[replace_index, ]
           surface_height[i, m] <- surface_height[i, replace_index]
+          snow_ice_thickness[i, m, ] <- snow_ice_thickness[i, replace_index, ]
+          mixing_vars[m, ] <- mixing_vars[replace_index, ]
         }
       }
     }
     
     #Corruption [nmembers x nstates] 
     x_corr <- x_star + nqt[, 1:nstates]
+    
+    #for(m in 1:nmembers){
+    #  orig_temp <- x_corr[m,1:ndepths_modeled]
+    #  dens <- rep(NA, ndepths_modeled)
+    #  for(d in 1:ndepths_modeled){
+    #  dens[d] <- temperature_to_density(orig_temp[d], the_sals_init)
+    #  }
+    #  index <- order(dens, decreasing = TRUE)
+    #  x_corr[m,1:ndepths_modeled] <- orig_temp[index]
+    #}
     
     if(npars > 0){
       pars_corr <- x[i - 1, , (nstates+1):(nstates+npars)] + pqt
@@ -262,18 +368,19 @@ run_EnKF <- function(x,
       if(npars > 0){
         
         if(i > (hist_days + 1)){
-          x[i, , ] <- cbind(x_corr, pars_star)
+          x[i, , ] <- cbind(x_corr, pars_corr)
         }else{
           x[i, , ] <- cbind(x_corr, pars_corr)
         }
         
         if(process_uncertainty == FALSE & i > (hist_days + 1)){
-          x[i, , ] <- cbind(x_star, pars_star)
+          x[i, , ] <- cbind(x_star, pars_corr)
         }
         
         if(i == (hist_days + 1) & initial_condition_uncertainty == FALSE){
           for(m in 1:nmembers){
             x[i, m, ] <- c(colMeans(x_star), pars_star[m, ]) 
+            x[i, m, ] <- c(colMeans(x_star), pars_corr[m, ]) 
           }
         }
         
@@ -312,10 +419,8 @@ run_EnKF <- function(x,
       
       #Extract the data uncertainity for the data 
       #types present during the time-step 
-
-      curr_psi <- psi_intercept[z_index] + psi_slope[z_index] * zt
-
       
+      curr_psi <- psi_intercept[z_index] + psi_slope[z_index] * zt
       
       if(length(z_index) > 1){
         psi_t <- diag(curr_psi)
@@ -379,17 +484,58 @@ run_EnKF <- function(x,
       
       #Update states array (transposes are necessary to convert 
       #between the dims here and the dims in the EnKF formulations)
-      x[i, , 1:nstates] <- t(t(x_corr) + k_t %*% (d_mat - h %*% t(x_corr)))
-      x[i, , (nstates+1):(nstates+npars)] <- t(t(pars_corr) + k_t_pars %*% (d_mat - h %*% t(x_corr)))
-
-      curr_qt_alpha <- qt_alpha
-      
+      update_increment <-  k_t %*% (d_mat - h %*% t(x_corr))
+      x[i, , 1:nstates] <- t(t(x_corr) + update_increment)
       if(npars > 0){
-        qt <- update_sigma(qt, p_t_combined, h_combined, x_star, pars_star, x_corr, pars_corr, psi_t, zt, npars, qt_pars, include_pars_in_qt_update, nstates, curr_qt_alpha)
-      }else{
-        qt <- update_sigma(qt, p_t, h, x_star, pars_star = NA, x_corr, pars_corr = NA, psi_t, zt, npars, qt_pars, include_pars_in_qt_update, nstates, curr_qt_alpha) 
+        x[i, , (nstates+1):(nstates+npars)] <- t(t(pars_corr) + k_t_pars %*% (d_mat - h %*% t(x_corr)))
       }
       
+      
+      
+      if(adapt_qt_method == 1){
+        #does previous day have an observation
+        previous_day_obs <- FALSE
+        if(length(which(!is.na(z[i-1, ]))) > 0){
+          previous_day_obs <- TRUE
+        }
+        
+        if(previous_day_obs){
+          running_residuals[1:(num_adapt_days - 1), ] <- running_residuals[2:num_adapt_days, ]
+          running_residuals[num_adapt_days, ] <- NA
+          running_residuals[num_adapt_days, z_index] <- zt - ens_mean[z_index]
+          #running_residuals[num_adapt_days, z_index] <- rowMeans(update_increment[z_index,])
+          if(!is.na(running_residuals[1, z_index[1]])){
+            qt <- update_qt(running_residuals, modeled_depths, qt, include_wq, npars, nstates, wq_start, wq_end, num_wq_vars)
+          }
+        }
+      }else if(adapt_qt_method == 2){
+        
+        if(npars > 0){
+          qt <- update_sigma(qt,
+                             p_t = p_t_combined,
+                             h = h_combined,
+                             x_star,
+                             pars_star,
+                             x_corr,
+                             pars_corr,
+                             psi_t,
+                             zt,
+                             npars,
+                             qt_pars,
+                             include_pars_in_qt_update,
+                             nstates,
+                             qt_alpha)
+        }else{
+          qt <- update_sigma(qt, p_t, h, x_star, pars_star = NA, x_corr, pars_corr = NA, psi_t, zt, npars, qt_pars, include_pars_in_qt_update, nstates, qt_alpha)
+        }
+        
+        qt <- localization(mat= qt,
+                           nstates,
+                           modeled_depths,
+                           num_wq_vars,
+                           wq_start,
+                           wq_end)
+      }
     }
     
     #IF NO INITIAL CONDITION UNCERTAINITY THEN SET EACH ENSEMBLE MEMBER TO THE MEAN
@@ -412,6 +558,8 @@ run_EnKF <- function(x,
       } 
     }
     
+    
+    
     ###################
     ## Quality Control Step 
     ##################
@@ -426,13 +574,25 @@ run_EnKF <- function(x,
     
     #Correct any parameter values outside bounds
     if(npars > 0){
-        for(par in 1:npars){
-          low_index <- which(x[i, ,nstates + par] < par_lowerbound[par])
-          high_index <- which(x[i, ,nstates + par] > par_upperbound[par]) 
-         x[i,low_index ,nstates + par] <- par_lowerbound[par]
-         x[i,high_index ,nstates + par] <- par_upperbound[par]
+      for(par in 1:npars){
+        low_index <- which(x[i, ,nstates + par] < par_lowerbound[par])
+        high_index <- which(x[i, ,nstates + par] > par_upperbound[par]) 
+        x[i,low_index ,nstates + par] <- par_lowerbound[par]
+        x[i,high_index ,nstates + par] <- par_upperbound[par]
       }
     }
+    
+    if(include_wq){
+      phyto_proportions <- array(NA, dim = c(nmembers, ndepths_modeled, num_phytos))
+      for(m in 1:nmembers){
+        phyto_groups_chla <- phyto_groups_star[m, ,] / biomass_to_chla
+        total <- rowSums(phyto_groups_chla)
+        phyto_proportions[m, , ] <- phyto_groups_chla/total
+        updated_tchla <- x[i, m, wq_start[num_wq_vars]:wq_end[num_wq_vars]]
+        tmp <- matrix(rep(biomass_to_chla,each=ndepths_modeled),nrow=ndepths_modeled)
+        x_phyto_groups[i, m , ] <- c(phyto_proportions[m, , ] * updated_tchla * tmp) 
+      }
+    } 
     
     ###############
     
@@ -447,14 +607,45 @@ run_EnKF <- function(x,
     if(i == (hist_days + 1)){
       x_restart <- x[i, , ]
       qt_restart <- qt
+      surface_height_restart <- surface_height[i, ]
+      snow_ice_restart <- snow_ice_thickness[i, , ]
+      avg_surf_temp_restart <- avg_surf_temp[i, ]
+      mixing_restart <- mixing_vars
+      
+      
+      
+      if(include_wq){
+        x_phyto_groups_restart <- x_phyto_groups[i, ,]
+      }else{
+        x_phyto_groups_restart <- NA
+      }
     }else if(hist_days == 0 & i == 2){
       x_restart <- x[1, , ]
       qt_restart <- qt
+      surface_height_restart <- surface_height[i, ]
+      snow_ice_restart <- snow_ice_thickness[i, , ]
+      avg_surf_temp_restart <- avg_surf_temp[i, ]
+      mixing_restart <- mixing_vars
+      
+      if(include_wq){
+        x_phyto_groups_restart <- x_phyto_groups[i, ,]
+      }else{
+        x_phyto_groups_restart <- NA
+      }
     }
   }
   
   return(list(x = x, 
               x_restart = x_restart, 
               qt_restart = qt_restart, 
-              x_prior = x_prior))
+              x_prior = x_prior,
+              x_phyto_groups_restart = x_phyto_groups_restart,
+              x_phyto_groups = x_phyto_groups,
+              surface_height_restart = surface_height_restart,
+              snow_ice_restart = snow_ice_restart,
+              snow_ice_thickness = snow_ice_thickness,
+              surface_height = surface_height,
+              avg_surf_temp_restart = avg_surf_temp_restart,
+              running_residuals = running_residuals,
+              mixing_restart = mixing_restart))
 }

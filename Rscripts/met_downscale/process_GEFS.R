@@ -26,7 +26,8 @@ process_GEFS <- function(file_name,
                          met_downscale_uncertainty,
                          WRITE_FILES,
                          downscaling_coeff,
-                         full_time_local){
+                         full_time_local,
+                         weather_uncertainty){
   # -----------------------------------
   # 1. read in and reformat forecast data
   # -----------------------------------
@@ -43,16 +44,18 @@ process_GEFS <- function(file_name,
   #end_step <- as_datetime(tail(d$forecast.date,1), tz = local_tzone)
   
   # adjust for different timezones in saved GEFS forecasts 
-  #if(date(full_time_local[1])>as_date("2018-12-07")){ 
-  #  for.input_tz = "GMT"
-  #}else{
-  #  for.input_tz = "US/Eastern"
-  #}
+  if(date(full_time_local[1])>as_datetime("2018-12-07 02:00:00", tz = "EST")){ 
+    for.input_tz = "GMT"
+  }else{
+    for.input_tz = "US/Eastern"
+  }
   
-  for.input_tz = "GMT"
+  #for.input_tz = "GMT"
   
   #full_time_local <- seq(begin_step, end_step, by = "1 hour", tz = local_tzone) # grid
-  forecasts <- prep_for(d, input_tz = for.input_tz, for.input_tz)
+  
+  forecasts <- prep_for(d, input_tz = for.input_tz, local_tzone, weather_uncertainty)
+  
   time0 = min(forecasts$timestamp)
   time_end = max(forecasts$timestamp)
   
@@ -66,41 +69,18 @@ process_GEFS <- function(file_name,
     if(is.na(downscaling_coeff)){
       load(file = paste(out_directory,"/debiased.coefficients.RData", sep = ""))
     }else{
-      load(file = paste(out_directory,"/",downscaling_coeff, sep = ""))
+      load(file = downscaling_coeff)
     }
-    ds = downscale_met(forecasts,
-                       debiased.coefficients,
-                       VarInfo,
-                       PLOT = FALSE,
-                       local_tzone = "GMT")
-    ds <- ds %>% mutate(AirTemp = AirTemp - 273.15) # from Kelvin to Celsius 
-    if(met_downscale_uncertainty == TRUE){
-      ## Downscaling + noise addition option
-      print("with noise")
-      ds.noise = add_noise(debiased = ds,
-                           cov = debiased.covar,
-                           n_ds_members,
-                           n_met_members,
-                           VarNames = VarInfo$VarNames) %>%
-        mutate(ShortWave = ifelse(ShortWaveOld == 0, 0, ShortWave),
-               ShortWave = ifelse(ShortWave < 0, 0, ShortWave),
-               RelHum = ifelse(RelHum <0, 0, RelHum),
-               RelHum = ifelse(RelHum > 100, 100, RelHum),
-               WindSpeed = ifelse(WindSpeed <0, 0, WindSpeed),
-               Rain = ifelse(Rain <0, 0, Rain)) %>%
-        arrange(NOAA.member, dscale.member, timestamp)
-      print("noise added")
-      output = ds.noise
-    }else{
-      print("without noise")
-      ds = ds %>% mutate(dscale.member = 0) %>%
-        mutate(ShortWave = ifelse(ShortWave <0, 0, ShortWave),
-               RelHum = ifelse(RelHum <0, 0, RelHum),
-               RelHum = ifelse(RelHum > 100, 100, RelHum),
-               Rain = ifelse(Rain <0, 0, Rain)) %>%
-        arrange(NOAA.member, timestamp)
-      output = ds
-    }
+    output <- downscale_met(forecasts,
+                        debiased.coefficients,
+                        VarInfo,
+                        PLOT = FALSE,
+                        local_tzone = local_tzone,
+                        debiased.covar,
+                        n_ds_members,
+                        n_met_members,
+                        met_downscale_uncertainty)
+    output <- output %>% mutate(AirTemp = AirTemp - 273.15) # from Kelvin to Celsius 
     
   }else{
     ## "out of box" option
@@ -117,6 +97,7 @@ process_GEFS <- function(file_name,
   
   hrly.observations <- hrly.observations %>%
     mutate(AirTemp = AirTemp - 273.15)
+  
   obs.time0 <- hrly.observations %>% filter(timestamp == time0)
   
   VarNamesStates = VarInfo %>%
@@ -124,10 +105,13 @@ process_GEFS <- function(file_name,
   VarNamesStates = VarNamesStates$VarNames
   
   # replace the first measurements of the downscaled output with observations so that the model has a smooth transition from past observations to future forecast
-  
+  # if missing observation then it skips this step
   for(i in 1:length(VarNamesStates)){
-    output[which(output$timestamp == time0),VarNamesStates[i]] = obs.time0[VarNamesStates[i]]
+    if(nrow(obs.time0[VarNamesStates[i]]) == 1){
+      output[which(output$timestamp == time0),VarNamesStates[i]] = obs.time0[VarNamesStates[i]]
+    }
   }
+  
   output.time0.6.hrs <- output %>% 
     filter(timestamp == time0 | timestamp == time0 + 6*60*60)
   states.output0.6.hrs <- spline_to_hourly(output.time0.6.hrs,VarNamesStates)
@@ -140,7 +124,7 @@ process_GEFS <- function(file_name,
   output <- output %>% filter(timestamp < time_end)
   
   output$timestamp <- with_tz(output$timestamp, local_tzone)
-
+  
   # -----------------------------------
   # 3. Produce output files
   # -----------------------------------
@@ -151,7 +135,7 @@ process_GEFS <- function(file_name,
     # hrly.Rain.Snow = forecasts %>% dplyr::mutate(Snow = 0) %>%
     #   select(timestamp, NOAA.member, Rain, Snow) %>%
     #   repeat_6hr_to_hrly()
-
+    
     
     write_file <- function(df){
       # formats GLM_climate, writes it as a .csv file, and returns the filename
@@ -166,8 +150,8 @@ process_GEFS <- function(file_name,
                                          "WindSpeed",
                                          "Rain",
                                          "Snow"))
-      current_filename = paste0(out_directory,'/','met_hourly_',file_name,'_NOAA',NOAA.ens,'_ds',dscale.ens,'.csv')
-      write.csv(GLM_climate,file = current_filename, row.names = FALSE, quote = FALSE)
+      current_filename = paste0('met_hourly_',file_name,'_NOAA',NOAA.ens,'_ds',dscale.ens,'.csv')
+      write.csv(GLM_climate,file = paste0(out_directory, "/", current_filename), row.names = FALSE, quote = FALSE)
       return(current_filename)
     }
     
@@ -212,13 +196,3 @@ process_GEFS <- function(file_name,
   }
   return(list(met_file_list, output))
 }
-
-
-
-
-
-
-
-
-
-

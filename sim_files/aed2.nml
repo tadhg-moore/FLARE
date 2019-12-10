@@ -144,7 +144,7 @@
 !-------------------------------------------------------------------------------
 &aed2_oxygen
    oxy_initial = 225.0 !overwritten by GLM nml
-   Fsed_oxy = -10.67607068!-15!-11.39271!-21.27753257!-24.21938847!-16.92136875 !-9.52843 !-21 intermediate for Mendota and Sunapee
+   Fsed_oxy = -20 !-15!-11.39271!-21.27753257!-24.21938847!-16.92136875 !-9.52843 !-21 intermediate for Mendota and Sunapee
    Ksed_oxy = 6.342157805!9.898986425!7.650863!7.05059507!8.385887191!8.573749872 !4.98461 !6.8 is same for Mendota and FCR
    theta_sed_oxy = 1.08 !going to go for the same theta throughout
 /
@@ -377,7 +377,7 @@
 !-------------------------------------------------------------------------------
 &aed2_phosphorus
    frp_initial = 0.065 !Kinneret&manual 0.29 from observational data
-   Fsed_frp = 0.0001!0.118264303!0.082020643!0.001 !!!!  manual 0.08 Paul 0.40
+   Fsed_frp = 0.1 !0.0001!0.118264303!0.082020643!0.001 !!!!  manual 0.08 Paul 0.40
    Ksed_frp = 50.0 !24.44440037!35.94895616!10 !!!! Kinneret 50.0 manual 80
    theta_sed_frp = 1.08
    phosphorus_reactant_variable = 'OXY_oxy'
@@ -461,7 +461,7 @@
      !dopr_initial =   1.0
      cpom_initial = 0 !formerly 100
    !-- Breakdown and mineralisation (basic pool)
-     Rdom_minerl  =   0.001
+     Rdom_minerl  =   0.001!0.0001
      Rpoc_hydrol  =   0.05
      Rpon_hydrol  =   0.05
      Rpop_hydrol  =   0.05
@@ -476,7 +476,7 @@
    ! dom_miner_fe3_reactant_var = 'GEO_feiii'
    ! dom_miner_so4_reactant_var = 'GEO_so4'
    ! dom_miner_ch4_reactant_var = 'CAR_ch4'
-     doc_miner_product_variable = '' !leave empty- if you add 'CAR_dic' it all goes to hell
+     doc_miner_product_variable = 'CAR_dic' !leave empty- if you add 'CAR_dic' it all goes to hell
      don_miner_product_variable = 'NIT_amm'
      dop_miner_product_variable = 'PHS_frp'
      dom_miner_nit_reactant_var = 'NIT_nit'
@@ -498,8 +498,8 @@
      X_cpom_p     = 0.001 !0.0001 !Paul had 0.001
 
     !-- Light related parameters
-     KeDOM         = 0.000005!0.0025!For 1 functional group, use 0.0025!0.0005 !paul had 0.0005; manual had 0.000005
-     KePOM         = 0.00096 !0.0015!paul had 0.001, 
+     KeDOM         = 0.0025!0.0025!For 1 functional group, use 0.0025!0.0005 !paul had 0.0005; manual had 0.000005
+     KePOM         = 0.0015 !0.0015!paul had 0.001, 
      KeDOMR        = 0.10000    ! paul had 0.05 formerly 0.1 = 1 (assuming KeDOMR is applied to CDOM in /m)
      KeCPOM        = 0.00096    ! = 0.08 (/m)/(mg/L)  /83.3  (mmol/m3)/(mg/L)
      simphotolysis = .false.    ! .true.
@@ -522,7 +522,7 @@
      Xsc = 0.5
      Xsn = 0.05
      Xsp = 0.005
-     Fsed_doc = 50 !10! check this-was100 !5 !manual 10.0, *****0.1 for Sunapee, 30 for Mendota
+     Fsed_doc = 100 !10! check this-was100 !5 !manual 10.0, *****0.1 for Sunapee, 30 for Mendota
      Fsed_don = 0.0 !bombs if set to >0 manual 1.0, *****0.01 for Sunapee, 5 for Mendota
      Fsed_dop = 0.0 !bombs if set to >0 manuual 0.020; *****0.001 for Sunapee, -900 for Mendota
      Ksed_dom = 4.5
@@ -569,11 +569,11 @@
 !
 !-------------------------------------------------------------------------------
 &aed2_phytoplankton
-   num_phytos = 1!4
-   the_phytos = 1!1,2,3,4
+   num_phytos = 3!4
+   the_phytos = 1,2,3!1,2,3,4
    settling = 1!1,1,1,1
    !-- Benthic phytoplankton group (microphytobenthos)
-  !do_mpb       =   0
+  do_mpb       =   0
   !R_mpbg       =   0.50
   !R_mpbr       =   0.05
   !I_Kmpb       = 100.00

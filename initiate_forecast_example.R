@@ -29,6 +29,7 @@ Sys.setenv(https_proxy = "http://proxy.dkit.ie:3128")
 # restart_file <- "/Users/quinn/Dropbox/Research/SSC_forecasting/testing_AED/test1_H_2018_10_12_2018_10_22_F_0_2019623_16_22.nc"
 restart_file <- NA
 
+sim_name <- "test" 
 forecast_days <- 16
 spin_up_days <- 0
 sim_name <- "test1_woaed" 
@@ -36,10 +37,15 @@ start_day_local <- "2019-05-05"  #Note: 2018-07-16 is the first day with CTD obs
 start_time_local <- "13:00:00"
 forecast_start_day_local <- "2019-05-10" 
 
+start_day_local <- "2019-09-20"  #Note: 2018-07-16 is the first day with CTD observations for initial conditions
+start_time_local <- "07:00:00"
+forecast_start_day_local <- "2019-09-22" 
+
 start_day_local <- as.POSIXct(start_day_local, format = "%Y-%m-%d")
 forecast_start_day_local <- as.POSIXct(forecast_start_day_local, format = "%Y-%m-%d")
-# hist_days <- as.numeric(difftime(start_day_local,forecast_start_day_local))
-hist_days <- as.numeric(difftime(forecast_start_day_local,start_day_local))
+hist_days <- as.numeric(difftime(as_date(forecast_start_day_local),as_date(start_day_local)))
+
+forecast_sss_on = FALSE
 
 out <- run_flare(start_day_local,
                  start_time_local,
@@ -51,6 +57,7 @@ out <- run_flare(start_day_local,
                  restart_file = restart_file,
                  code_folder = code_folder,
                  forecast_location = forecast_location,
+                 execute_location = execute_location,
                  push_to_git = push_to_git,
                  pull_from_git = pull_from_git,
                  data_location = data_location,
@@ -67,7 +74,9 @@ out <- run_flare(start_day_local,
                  FLAREversion = FLAREversion,
                  met_ds_obs_start = met_ds_obs_start,
                  met_ds_obs_end = met_ds_obs_end,
-                 modeled_depths = modeled_depths)
+                 modeled_depths = modeled_depths,
+                 forecast_sss_on = forecast_sss_on)
+
 
 plot_forecast(pdf_file_name = unlist(out)[2],
               output_file = unlist(out)[1],

@@ -26,6 +26,7 @@ run_flare<-function(start_day_local,
                     restart_file = NA,
                     code_folder, 
                     forecast_location = NA,
+                    execute_location = NA,
                     push_to_git = FALSE,
                     pull_from_git = TRUE, 
                     data_location = NA, 
@@ -56,6 +57,8 @@ run_flare<-function(start_day_local,
   source(paste0(code_folder,"/","Rscripts/met_downscale/process_downscale_GEFS.R")) 
   source(paste0(code_folder,"/","Rscripts/update_qt.R"))
   source(paste0(code_folder,"/","Rscripts/glmtools.R"))
+  source(paste0(code_folder,"/","Rscripts/localization.R")) 
+  source(paste0(code_folder,"/","Rscripts/temperature_to_density.R"))
   
   source(paste0(code_folder,"/","Rscripts/",lake_name,"/create_inflow_outflow_file.R"))
   source(paste0(code_folder,"/","Rscripts/",lake_name,"/create_obs_met_input.R"))
@@ -67,8 +70,10 @@ run_flare<-function(start_day_local,
   source(paste0(code_folder,"/","Rscripts/",lake_name,"/extract_temp_chain.R"))
   source(paste0(code_folder,"/","Rscripts/",lake_name,"/read_sss_files.R"))
   source(paste0(code_folder,"/","Rscripts/",lake_name,"/extract_nutrients.R"))
-  
-  
+  source(paste0(code_folder,"/","Rscripts/",lake_name,"/temp_oxy_chla_qaqc.R")) 
+  source(paste0(code_folder,"/","Rscripts/",lake_name,"/met_qaqc.R")) 
+  source(paste0(code_folder,"/","Rscripts/",lake_name,"/inflow_qaqc.R"))   
+
   ### METEROLOGY DOWNSCALING OPTIONS
   if(is.na(downscaling_coeff)){
     FIT_PARAMETERS <- TRUE
@@ -104,6 +109,7 @@ run_flare<-function(start_day_local,
     initial_condition_uncertainty <- FALSE
     parameter_uncertainty <- FALSE
     met_downscale_uncertainty <- FALSE
+    n_inflow_outflow_members <<- 1
   }else if(uncert_mode == 3){
     #Only process uncertainty
     use_obs_constraint <- TRUE
@@ -114,6 +120,7 @@ run_flare<-function(start_day_local,
     initial_condition_uncertainty <- FALSE
     parameter_uncertainty <- FALSE
     met_downscale_uncertainty <- FALSE
+    n_inflow_outflow_members <<- 1
   }else if(uncert_mode == 4){
     #only noaa weather uncertainty
     use_obs_constraint <- TRUE
@@ -124,6 +131,7 @@ run_flare<-function(start_day_local,
     initial_condition_uncertainty <- FALSE
     parameter_uncertainty <- FALSE
     met_downscale_uncertainty <- FALSE
+    n_inflow_outflow_members <<- 1
   }else if(uncert_mode == 5){
     #only initial condition uncertainty with data constraint
     use_obs_constraint <- TRUE
@@ -134,6 +142,7 @@ run_flare<-function(start_day_local,
     initial_condition_uncertainty <- TRUE
     parameter_uncertainty <- FALSE
     met_downscale_uncertainty <- FALSE
+    n_inflow_outflow_members <<- 1
   }else if(uncert_mode == 6){
     #only initial condition uncertainty without data constraint
     use_obs_constraint <- FALSE
@@ -144,6 +153,7 @@ run_flare<-function(start_day_local,
     initial_condition_uncertainty <- TRUE
     parameter_uncertainty <- FALSE
     met_downscale_uncertainty <- FALSE
+    n_inflow_outflow_members <<- 1
   }else if(uncert_mode == 7){
     #only parameter uncertainty
     use_obs_constraint <- TRUE
@@ -154,6 +164,7 @@ run_flare<-function(start_day_local,
     initial_condition_uncertainty <- FALSE
     parameter_uncertainty <- TRUE
     met_downscale_uncertainty <- FALSE
+    n_inflow_outflow_members <<- 1
   }else if(uncert_mode == 8){
     #only met downscale uncertainty
     use_obs_constraint <- TRUE
@@ -164,11 +175,23 @@ run_flare<-function(start_day_local,
     initial_condition_uncertainty <- FALSE
     parameter_uncertainty <- FALSE
     met_downscale_uncertainty <- TRUE
+    n_inflow_outflow_members <<- 1
   }else if(uncert_mode == 9){
     #No sources of uncertainty and no data used to constrain 
     use_obs_constraint <- FALSE
     #SOURCES OF uncertainty
     observation_uncertainty <- FALSE
+    process_uncertainty <- FALSE
+    weather_uncertainty <- FALSE
+    initial_condition_uncertainty <- FALSE
+    parameter_uncertainty <- FALSE
+    met_downscale_uncertainty <- FALSE
+    n_inflow_outflow_members <<- 1
+  }else if(uncert_mode == 10){
+    #Only inflow uncertainty
+    use_obs_constraint <- TRUE
+    #SOURCES OF uncertainty
+    observation_uncertainty <- TRUE
     process_uncertainty <- FALSE
     weather_uncertainty <- FALSE
     initial_condition_uncertainty <- FALSE
@@ -194,6 +217,8 @@ run_flare<-function(start_day_local,
     n_enkf_members <- 3
   }
   
+  #met_downscale_uncertainty <- FALSE
+  
   ####################################################
   #### DETECT PLATFORM  
   ####################################################
@@ -217,7 +242,8 @@ run_flare<-function(start_day_local,
   temperature_location <- paste0(data_location, "/", "mia-data") #FCR SPECIFIC
   met_station_location <- paste0(data_location, "/", "carina-data") #FCR SPECIFIC
   noaa_location <- paste0(data_location, "/", "noaa-data") #FCR SPECIFIC
-  noaa_location <- "C:\\Users\\mooret\\Desktop\\flare_feeagh\\feeagh_data\\noaa_data" # Added for Feeagh data
+  manual_data_location <- paste0(data_location, "/", "manual-data") #FCR SPECIFIC
+  diana_data_location <- paste0(data_location, "/", "diana-data") #FCR SPECIFIC
   if(pull_from_git){
     
     if(!file.exists(temperature_location)){
@@ -233,6 +259,16 @@ run_flare<-function(start_day_local,
       system("git clone -b noaa-data --single-branch https://github.com/CareyLabVT/SCCData.git noaa-data")
     }
     
+    if(!file.exists(manual_data_location)){
+      setwd(data_location)
+      system("git clone -b manual-data --single-branch https://github.com/CareyLabVT/SCCData.git manual-data")
+    }
+    
+    if(!file.exists(diana_data_location)){
+      setwd(data_location)
+      system("git clone -b diana-data --single-branch https://github.com/CareyLabVT/SCCData.git diana-data")
+    }
+    
     setwd(temperature_location)
     system(paste0("git pull"))
     
@@ -241,6 +277,34 @@ run_flare<-function(start_day_local,
     
     setwd(noaa_location)
     system(paste0("git pull"))
+    
+    setwd(manual_data_location)
+    system(paste0("git pull"))
+    
+    setwd(diana_data_location)
+    system(paste0("git pull"))
+    
+    if(length(met_obs_fname) > 1 & !file.exists(met_obs_fname[2])){
+      inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/389/2/63808664f8feda6a703ef42601207d2e" 
+      download.file(inUrl1,met_obs_fname[2],method="curl")
+    }
+    
+    if(length(temp_obs_fname) > 1 & !file.exists(temp_obs_fname[2])){
+      inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/271/2/ea8d89aa2804fb4657acb5b2dbdcc944" 
+      download.file(inUrl1,temp_obs_fname[2],method="curl")
+      
+    }
+    
+    if(!is.na(ctd_fname) & !file.exists(ctd_fname)){
+      inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/200/6/2143055cdfad2e5bd99c2b0b2670cc56" 
+      download.file(inUrl1,ctd_fname,method="curl")
+    }
+    
+    if(!is.na(nutrients_fname) & !file.exists(nutrients_fname)){
+      inUrl1  <- "https://pasta.lternet.edu/package/data/eml/edi/199/5/2b3dc84ae6b12d10bd5485f1c300af13" 
+      download.file(inUrl1,nutrients_fname,method="curl")
+    }
+    
   }
   
   ####################################################
@@ -258,6 +322,8 @@ run_flare<-function(start_day_local,
   start_datetime_GMT <- with_tz(start_datetime_local, tzone = "GMT")
   end_datetime_GMT <- with_tz(end_datetime_local, tzone = "GMT")
   forecast_start_time_GMT<- with_tz(forecast_start_time_local, tzone = "GMT")
+  
+  forecast_start_time_GMT_past <- forecast_start_time_GMT - days(1)
   
   noaa_hour <- NA
   if(!hour(forecast_start_time_GMT) %in% c(0,6,12,18) & forecast_days > 0){
@@ -288,6 +354,18 @@ run_flare<-function(start_day_local,
   }else{
     forecast_month_GMT <- paste0(month(forecast_start_time_GMT))
   }
+  
+  if(day(forecast_start_time_GMT_past) < 10){
+    forecast_day_GMT_past <- paste0("0", day(forecast_start_time_GMT_past))
+  }else{
+    forecast_day_GMT_past <- paste0(day(forecast_start_time_GMT_past))
+  }
+  if(month(forecast_start_time_GMT_past) < 10){
+    forecast_month_GMT_past <- paste0("0", month(forecast_start_time_GMT_past))
+  }else{
+    forecast_month_GMT_past <- paste0(month(forecast_start_time_GMT_past))
+  }
+  
   full_time_GMT <- seq(start_datetime_GMT, end_datetime_GMT, by = "1 day")
   full_time_local <- seq(start_datetime_local, end_datetime_local, by = "1 day")
   full_time_GMT <- strftime(full_time_GMT, 
@@ -320,7 +398,7 @@ run_flare<-function(start_day_local,
   ndepths_modeled <- length(modeled_depths)
   num_wq_vars <- length(wq_names)
   if(include_wq){
-   glm_output_vars <- c("temp", wq_names)
+    glm_output_vars <- c("temp", wq_names)
   }else{
     glm_output_vars <- "temp"
   }
@@ -339,6 +417,8 @@ run_flare<-function(start_day_local,
     nstates <- ndepths_modeled
   }
   
+  num_phytos <- length(tchla_components_vars)
+  
   ###CREATE HISTORICAL MET FILE
   if(met_downscale_uncertainty == FALSE){
     n_enkf_members <- n_enkf_members * n_ds_members
@@ -350,7 +430,7 @@ run_flare<-function(start_day_local,
   ####################################################
   
   ###CREATE DIRECTORY PATHS AND STRUCTURE
-  working_directory <- paste0(forecast_location, "/", "working_directory")
+  working_directory <- paste0(execute_location, "/", "working_directory")
   if(!dir.exists(working_directory)){
     dir.create(working_directory, showWarnings = FALSE)
   }
@@ -364,8 +444,15 @@ run_flare<-function(start_day_local,
                                noaa_hour,
                                "z")
   
+  forecast_base_name_past <- paste0(year(forecast_start_time_GMT_past),
+                                    forecast_month_GMT_past,
+                                    forecast_day_GMT_past,
+                                    "gep_all_",
+                                    noaa_hour,
+                                    "z")
+  
   met_obs_fname_wdir <- met_obs_fname
-
+  
   met_forecast_base_file_name <- paste0("met_hourly_",
                                         forecast_base_name,
                                         "_ens")
@@ -375,36 +462,111 @@ run_flare<-function(start_day_local,
                        day(full_time_local[1]))
   }
   
-  tmp <- file.copy(from = paste0(temperature_location, "/", temp_obs_fname[1]), 
-                   to = working_directory, 
-                   overwrite = TRUE)
-  
-  extra_input_files <- paste0(data_location, "/", "extra_files")
-  fl <- c(list.files(extra_input_files, full.names = TRUE))
-  tmp <- file.copy(from = fl, to = working_directory, overwrite = TRUE)
-  
   sim_files_folder <- paste0(code_folder, "/", "sim_files")
   fl <- c(list.files(sim_files_folder, full.names = TRUE))
   tmp <- file.copy(from = fl, to = working_directory, overwrite = TRUE)
-
+  
   if(!is.na(restart_file)){
     tmp <- file.copy(from = restart_file, to = working_directory, overwrite = TRUE)
   }
   
-
+  
   
   ####################################################
   #### STEP 5: PROCESS AND ORGANIZE DRIVER DATA
   ####################################################
   
   met_file_names <- rep(NA, 1+(n_met_members*n_ds_members))
-  obs_met_outfile <- paste0(working_directory, "/", "GLM_met.csv") #Missing extra file
-  create_obs_met_input(fname = met_obs_fname_wdir[1], #Need to be different for Feeagh
-                       outfile=obs_met_outfile,
-                       full_time_hour_local, 
-                       input_file_tz = "EST5EDT",
-                       local_tzone)
-  met_file_names[1] <- obs_met_outfile
+  obs_met_outfile <- "GLM_met.csv"
+  
+  cleaned_met_file <- paste0(working_directory, "/FCRMet_postQAQC.csv")
+  met_qaqc(fname = met_obs_fname,
+           cleaned_met_file,
+           input_file_tz = "EST",
+           local_tzone)
+  
+  met_obs_fname_wdir <- cleaned_met_file
+  
+  missing_met <- create_obs_met_input(fname = met_obs_fname_wdir,
+                                      outfile=obs_met_outfile,
+                                      full_time_hour_local, 
+                                      local_tzone,
+                                      working_directory,
+                                      hist_days)
+  
+  if(missing_met  == FALSE){
+    met_file_names[1] <- obs_met_outfile
+  }else{
+    if(hist_days > 1){
+      stop(paste0("Running more than 1 hist_day but met data has ",missing_met," values"))
+    }
+    in_directory <- paste0(noaa_location)
+    out_directory <- working_directory
+    file_name <- forecast_base_name_past
+    
+    VarInfo <- data.frame("VarNames" = c("AirTemp",
+                                         "WindSpeed",
+                                         "RelHum",
+                                         "ShortWave",
+                                         "LongWave",
+                                         "Rain"),
+                          "VarType" = c("State",
+                                        "State",
+                                        "State",
+                                        "Flux",
+                                        "Flux",
+                                        "Flux"),
+                          "ds_res" = c("hour",
+                                       "hour",
+                                       "hour",
+                                       "hour",
+                                       "6hr",
+                                       "6hr"),
+                          "debias_method" = c("lm",
+                                              "none",
+                                              "lm",
+                                              "lm",
+                                              "lm",
+                                              "compare_totals"),
+                          "use_covariance" = c(TRUE,
+                                               FALSE,
+                                               TRUE,
+                                               TRUE,
+                                               TRUE,
+                                               FALSE),
+                          stringsAsFactors = FALSE)
+    
+    replaceObsNames <- c("AirTemp" = "AirTemp",
+                         "WindSpeed" = "WindSpeed",
+                         "RelHum" = "RelHum",
+                         "ShortWave" = "ShortWave",
+                         "LongWave" = "LongWave",
+                         "Rain" = "Rain")
+    
+    temp_met_file<- process_downscale_GEFS(folder = code_folder,
+                                           noaa_location,
+                                           input_met_file = met_obs_fname_wdir,
+                                           working_directory,
+                                           sim_files_folder = paste0(code_folder, "/", "sim_files"),
+                                           n_ds_members,
+                                           n_met_members,
+                                           file_name,
+                                           local_tzone,
+                                           FIT_PARAMETERS,
+                                           DOWNSCALE_MET,
+                                           met_downscale_uncertainty = FALSE,
+                                           compare_output_to_obs = FALSE,
+                                           VarInfo,
+                                           replaceObsNames,
+                                           downscaling_coeff,
+                                           full_time_local,
+                                           first_obs_date = met_ds_obs_start,
+                                           last_obs_date = met_ds_obs_end,
+                                           input_met_file_tz = local_tzone,
+                                           weather_uncertainty)
+    
+    met_file_names[1] <- temp_met_file[1]
+  }
   
   ###CREATE FUTURE MET FILES
   if(forecast_days > 0 & use_future_met){
@@ -444,12 +606,12 @@ run_flare<-function(start_day_local,
                                                FALSE),
                           stringsAsFactors = FALSE)
     
-    replaceObsNames <- c("AirTC_Avg" = "AirTemp",
-                         "WS_ms_Avg" = "WindSpeed",
-                         "RH" = "RelHum",
-                         "SR01Up_Avg" = "ShortWave",
-                         "IR01UpCo_Avg" = "LongWave",
-                         "Rain_mm_Tot" = "Rain")
+    replaceObsNames <- c("AirTemp" = "AirTemp",
+                         "WindSpeed" = "WindSpeed",
+                         "RelHum" = "RelHum",
+                         "ShortWave" = "ShortWave",
+                         "LongWave" = "LongWave",
+                         "Rain" = "Rain")
     
     met_file_names[2:(1+(n_met_members*n_ds_members))] <- process_downscale_GEFS(folder = code_folder,
                                                                                  noaa_location,
@@ -470,12 +632,63 @@ run_flare<-function(start_day_local,
                                                                                  full_time_local,
                                                                                  first_obs_date = met_ds_obs_start,
                                                                                  last_obs_date = met_ds_obs_end,
-                                                                                 input_met_file_tz = "EST5EDT")
+                                                                                 input_met_file_tz = local_tzone,
+                                                                                 weather_uncertainty)
     
      if(weather_uncertainty == FALSE & met_downscale_uncertainty == TRUE){
       met_file_names <- met_file_names[1:(1+(1*n_ds_members))]
     }else if(weather_uncertainty == FALSE & met_downscale_uncertainty == FALSE){
       met_file_names <- met_file_names[1:2]
+    }
+    
+    if(weather_uncertainty == FALSE & n_inflow_outflow_members > 1){
+      inflow_met_file_names <- rep(NA, 1+(n_met_members*n_ds_members))
+      inflow_met_file_names[2:(1+(n_met_members*n_ds_members))] <- process_downscale_GEFS(folder = code_folder,
+                                                                                          noaa_location,
+                                                                                          input_met_file = met_obs_fname_wdir,
+                                                                                          working_directory,
+                                                                                          sim_files_folder = paste0(code_folder, "/", "sim_files"),
+                                                                                          n_ds_members,
+                                                                                          n_met_members,
+                                                                                          file_name,
+                                                                                          local_tzone,
+                                                                                          FIT_PARAMETERS,
+                                                                                          DOWNSCALE_MET,
+                                                                                          met_downscale_uncertainty,
+                                                                                          compare_output_to_obs = FALSE,
+                                                                                          VarInfo,
+                                                                                          replaceObsNames,
+                                                                                          downscaling_coeff,
+                                                                                          full_time_local,
+                                                                                          first_obs_date = met_ds_obs_start,
+                                                                                          last_obs_date = met_ds_obs_end,
+                                                                                          input_met_file_tz = local_tzone,
+                                                                                          weather_uncertainty = TRUE)
+    }else if(met_downscale_uncertainty == FALSE & n_inflow_outflow_members > 1){
+      inflow_met_file_names <- rep(NA, 1+(n_met_members*n_ds_members))
+      inflow_met_file_names[2:(1+(n_met_members*n_ds_members))] <- process_downscale_GEFS(folder = code_folder,
+                                                                                          noaa_location,
+                                                                                          input_met_file = met_obs_fname_wdir,
+                                                                                          working_directory,
+                                                                                          sim_files_folder = paste0(code_folder, "/", "sim_files"),
+                                                                                          n_ds_members,
+                                                                                          n_met_members,
+                                                                                          file_name,
+                                                                                          local_tzone,
+                                                                                          FIT_PARAMETERS,
+                                                                                          DOWNSCALE_MET,
+                                                                                          met_downscale_uncertainty = TRUE,
+                                                                                          compare_output_to_obs = FALSE,
+                                                                                          VarInfo,
+                                                                                          replaceObsNames,
+                                                                                          downscaling_coeff,
+                                                                                          full_time_local,
+                                                                                          first_obs_date = met_ds_obs_start,
+                                                                                          last_obs_date = met_ds_obs_end,
+                                                                                          input_met_file_tz = local_tzone,
+                                                                                          weather_uncertainty)
+    }else{
+      inflow_met_file_names <- met_file_names
     }
   }
   
@@ -484,27 +697,37 @@ run_flare<-function(start_day_local,
     n_met_members <- 1
   }
   
+  cleaned_inflow_file <- paste0(working_directory, "/FCRinflow_postQAQC.csv")
+  
+  inflow_qaqc(fname = inflow_file1,
+              cleaned_inflow_file ,
+              local_tzone, 
+              input_file_tz = 'EST',
+              working_directory)
+  
+  
   ##CREATE INFLOW AND OUTFILE FILES
   inflow_outflow_files <- create_inflow_outflow_file(full_time_day_local,
                                                      working_directory, 
-                                                     input_file_tz = "EST5EDT",
+                                                     input_file_tz = "EST",
                                                      start_forecast_step,
-                                                     hold_inflow_outflow_constant,
-                                                     inflow_file1,
+                                                     inflow_file1 = cleaned_inflow_file,
                                                      inflow_file2,
                                                      outflow_file1,
-                                                     local_tzone)
+                                                     chemistry_file,
+                                                     local_tzone,
+                                                     met_file_names,
+                                                     forecast_days)
   
   inflow_file_names <- cbind(inflow1 = inflow_outflow_files$inflow_file_names,
                              inflow2 = inflow_outflow_files$wetland_file_names)
   outflow_file_names <- cbind(inflow_outflow_files$spillway_file_names)
   
-  # management_input <- read_sss_files(full_time_day_local,
-  #                                    working_directory,
-  #                                    input_file_tz = 'EST5EDT', 
-  #                                    sss_file = "Calc_HOX_flow_DO_20190320.csv",
-  #                                    local_tzone)
-  # 
+  management_input <- read_sss_files(full_time_day_local,
+                                     working_directory,
+                                     input_file_tz = 'EST5EDT', 
+                                     sss_file = sss_fname,
+                                     local_tzone)
   
   ####################################################
   #### STEP 6: PROCESS AND ORGANIZE STATE DATA
@@ -514,57 +737,73 @@ run_flare<-function(start_day_local,
   # observed_depths_temp, local_tzone, observed_depths_do, exo_2_ctd_chla, use_ctd
   
   #Extract observations, 
-  temp_obs_fname_wdir <- paste0(working_directory, "/", temp_obs_fname)
+  temp_obs_fname_wdir <- temp_obs_fname
+  
+  cleaned_temp_oxy_chla_file <- paste0(working_directory, "/Catwalk_postQAQC.csv")
+  temp_oxy_chla_qaqc(temp_obs_fname_wdir[1], 
+                     paste0(data_location, '/mia-data/CAT_MaintenanceLog.txt'), 
+                     cleaned_temp_oxy_chla_file)
+  
+  new_temp_obs_fname_wdir <- temp_obs_fname_wdir
+  new_temp_obs_fname_wdir[1] <- cleaned_temp_oxy_chla_file
+  
   #PROCESS TEMPERATURE OBSERVATIONS
-  obs_temp <- extract_temp_chain(fname = temp_obs_fname_wdir[1],
+  obs_temp <- extract_temp_chain(fname = new_temp_obs_fname_wdir,
                                  full_time_local,
                                  modeled_depths = modeled_depths,
                                  observed_depths_temp = observed_depths_temp,
                                  input_file_tz = "EST5EDT",
                                  local_tzone)
   
-  #PROCESS DO OBSERVATIONS
-  # obs_do <- extract_do_chain(fname = temp_obs_fname_wdir[1],
-  #                            full_time_local,
-  #                            modeled_depths = modeled_depths,
-  #                            observed_depths_do= observed_depths_do,
-  #                            input_file_tz = "EST5EDT", 
-  #                            local_tzone)
-  # 
-  # obs_chla <- extract_chla_chain(fname = temp_obs_fname_wdir[1],
-  #                                full_time_local,
-  #                                modeled_depths = modeled_depths,
-  #                                observed_depths_chla_fdom,
-  #                                input_file_tz = "EST5EDT", 
-  #                                local_tzone)
-  # 
-  # obs_fdom <- extract_do_chain(fname = temp_obs_fname_wdir[1],
-  #                              full_time_local,
-  #                              modeled_depths = modeled_depths,
-  #                              observed_depths_chla_fdom,
-  #                              input_file_tz = "EST5EDT", 
-  #                              local_tzone)
-  # 
-  # #obs_fdom$obs[, ] <- NA
-  # 
-  # obs_nutrients <- extract_nutrients(fname = paste0(data_location,"/extra_files/chemistry.csv"),
-  #                                    full_time_day_local,
-  #                                    modeled_depths = modeled_depths,
-  #                                    input_file_tz = "EST5EDT", 
-  #                                    local_tzone)
-  
-  #Combine fdom and nutrients
-  # for(i in 1:length(full_time_day_local)){
-  #   if(length(which(!is.na(obs_nutrients$DOC[i,]))) > 0){
-  #     obs_fdom$obs[i,which(is.na(obs_fdom$obs[i,]))] <- obs_nutrients$DOC[i,which(is.na(obs_fdom$obs[i,]))]
-  #   }
-  # }
+  if(include_wq){
+    #PROCESS DO OBSERVATIONS
+    obs_do <- extract_do_chain(fname = new_temp_obs_fname_wdir,
+                               full_time_local,
+                               modeled_depths = modeled_depths,
+                               observed_depths_do= observed_depths_do,
+                               input_file_tz = "EST5EDT", 
+                               local_tzone)
+    
+    obs_chla <- extract_chla_chain(fname = new_temp_obs_fname_wdir,
+                                   full_time_local,
+                                   modeled_depths = modeled_depths,
+                                   observed_depths_chla_fdom,
+                                   input_file_tz = "EST5EDT", 
+                                   local_tzone)
+    
+    obs_fdom <- extract_do_chain(fname = new_temp_obs_fname_wdir,
+                                 full_time_local,
+                                 modeled_depths = modeled_depths,
+                                 observed_depths_chla_fdom,
+                                 input_file_tz = "EST5EDT", 
+                                 local_tzone)
+    
+    if(use_nutrient_data){
+      obs_nutrients <- extract_nutrients(fname = nutrients_fname,
+                                         full_time_day_local,
+                                         modeled_depths = modeled_depths,
+                                         input_file_tz = "EST5EDT", 
+                                         local_tzone)
+      
+      #Combine fdom and nutrients
+      for(i in 1:length(full_time_day_local)){
+        if(length(which(!is.na(obs_nutrients$DOC[i,]))) > 0){
+          obs_fdom$obs[i,which(is.na(obs_fdom$obs[i,]))] <- obs_nutrients$DOC[i,which(is.na(obs_fdom$obs[i,]))]
+        }
+      }
+    }else{
+      obs_nutrients <- NULL
+      obs_nutrients$NH4 <- array(NA, dim = dim(obs_fdom$obs))
+      obs_nutrients$NO3 <- array(NA, dim = dim(obs_fdom$obs))
+      obs_nutrients$SRP <- array(NA, dim = dim(obs_fdom$obs))
+    }
+  }
   
   #Use the CTD observation rather than the sensor string when CTD data is avialable
   if(use_ctd){
-
+    
     #NEED TO DOUBLE CHECK TIME ZONE
-    obs_ctd <- extract_CTD(fname = paste0(data_location,"/CTD/CTD_Meta_13_18_final.csv"),
+    obs_ctd <- extract_CTD(fname = ctd_fname,
                            full_time_day_local,
                            modeled_depths = modeled_depths,
                            input_file_tz = "EST5EDT",
@@ -574,8 +813,10 @@ run_flare<-function(start_day_local,
     for(i in 1:length(full_time_day_local)){
       if(!is.na(obs_ctd$obs_temp[i, 1])){
         obs_temp$obs[i,which(is.na(obs_temp$obs[i,]))] <- obs_ctd$obs_temp[i,which(is.na(obs_temp$obs[i,]))]
-        obs_do$obs[i,which(is.na(obs_do$obs[i,]))] <- obs_ctd$obs_do[i,which(is.na(obs_do$obs[i,])) ]
-        obs_chla$obs[i,which(is.na(obs_chla$obs[i,]))] <- obs_ctd$obs_chla[i, which(is.na(obs_chla$obs[i,])) ]
+        if(include_wq){
+          obs_do$obs[i,which(is.na(obs_do$obs[i,]))] <- obs_ctd$obs_do[i,which(is.na(obs_do$obs[i,])) ]
+          obs_chla$obs[i,which(is.na(obs_chla$obs[i,]))] <- obs_ctd$obs_chla[i, which(is.na(obs_chla$obs[i,])) ]
+        }
       }
     }
   }
@@ -607,7 +848,7 @@ run_flare<-function(start_day_local,
     OGM_pop_obs <- array(NA, dim = obs_dims)
     NCS_ss1_obs <- array(NA, dim = obs_dims)
     PHS_frp_ads_obs <- array(NA, dim = obs_dims)
-    PHY_AGGREGATE_obs <- obs_chla$obs
+    PHY_TCHLA_obs <- obs_chla$obs
     
     z <- cbind(obs_temp$obs,
                OXY_oxy_obs,
@@ -626,7 +867,7 @@ run_flare<-function(start_day_local,
                OGM_pop_obs,
                NCS_ss1_obs,
                PHS_frp_ads_obs,
-               PHY_AGGREGATE_obs)
+               PHY_TCHLA_obs)
   }else{
     z <- cbind(obs_temp$obs) 
   }
@@ -648,23 +889,25 @@ run_flare<-function(start_day_local,
   init_temps_obs <- obs_temp$obs[1, which(!is.na(obs_temp$obs[1, ]))]
   init_obs_temp_depths <- modeled_depths[which(!is.na(obs_temp$obs[1, ]))]
   
-  # init_do_obs <- obs_do$obs[1, which(!is.na(obs_do$obs[1, ]))]
-  # init_obs_do_depths <- modeled_depths[which(!is.na(obs_do$obs[1, ]))]
-  # 
-  # init_chla_obs <- obs_chla$obs[1, which(!is.na(obs_chla$obs[1, ]))]
-  # init_chla_obs_depths <- modeled_depths[which(!is.na(obs_chla$obs[1, ]))]
-  # 
-  # init_doc_obs <- obs_fdom$obs[1, which(!is.na(obs_fdom$obs[1, ]))]
-  # init_doc_obs_depths <- modeled_depths[which(!is.na(obs_fdom$obs[1, ]))]
-  # 
-  # init_nit_amm_obs <- obs_nutrients$NH4[1, which(!is.na(obs_nutrients$NH4[1, ]))]
-  # init_nit_amm_obs_depths <- modeled_depths[which(!is.na(obs_nutrients$NH4[1, ]))]
-  # 
-  # init_nit_nit_obs <- obs_nutrients$NO3[1, which(!is.na(obs_nutrients$NO3[1, ]))]
-  # init_nit_nit_obs_depths <- modeled_depths[which(!is.na(obs_nutrients$NO3[1, ]))]
-  # 
-  # init_phs_frp_obs <- obs_nutrients$SRP[1, which(!is.na(obs_nutrients$SRP[1, ]))]
-  # init_phs_frp_obs_depths <- modeled_depths[which(!is.na(obs_nutrients$SRP[1, ]))]
+  if(include_wq){
+    init_do_obs <- obs_do$obs[1, which(!is.na(obs_do$obs[1, ]))]
+    init_obs_do_depths <- modeled_depths[which(!is.na(obs_do$obs[1, ]))]
+    
+    init_chla_obs <- obs_chla$obs[1, which(!is.na(obs_chla$obs[1, ]))]
+    init_chla_obs_depths <- modeled_depths[which(!is.na(obs_chla$obs[1, ]))]
+    
+    init_doc_obs <- obs_fdom$obs[1, which(!is.na(obs_fdom$obs[1, ]))]
+    init_doc_obs_depths <- modeled_depths[which(!is.na(obs_fdom$obs[1, ]))]
+    
+    init_nit_amm_obs <- obs_nutrients$NH4[1, which(!is.na(obs_nutrients$NH4[1, ]))]
+    init_nit_amm_obs_depths <- modeled_depths[which(!is.na(obs_nutrients$NH4[1, ]))]
+    
+    init_nit_nit_obs <- obs_nutrients$NO3[1, which(!is.na(obs_nutrients$NO3[1, ]))]
+    init_nit_nit_obs_depths <- modeled_depths[which(!is.na(obs_nutrients$NO3[1, ]))]
+    
+    init_phs_frp_obs <- obs_nutrients$SRP[1, which(!is.na(obs_nutrients$SRP[1, ]))]
+    init_phs_frp_obs_depths <- modeled_depths[which(!is.na(obs_nutrients$SRP[1, ]))]
+  }
   
   
   #OGM_doc_init_depth <- NA
@@ -705,8 +948,6 @@ run_flare<-function(start_day_local,
     wq_end <- temp_end+1
   }
   
-  the_sals_init <- 0.0
-  
   if(include_wq & is.na(restart_file)){
     
     #Initialize Oxygen using data if avialable
@@ -721,14 +962,14 @@ run_flare<-function(start_day_local,
     
     #Initialize Chla usind data if avialable
     if(length(!is.na(init_chla_obs)) == 0){
-      PHY_AGGREGATE_init_depth <- rep(PHY_AGGREGATE_init, ndepths_modeled) 
+      PHY_TCHLA_init_depth <- rep(PHY_TCHLA_init, ndepths_modeled) 
     }else if(length(!is.na(init_chla_obs)) == 1){
-      PHY_AGGREGATE_init_depth <- rep(init_chla_obs, ndepths_modeled)
+      PHY_TCHLA_init_depth <- rep(init_chla_obs, ndepths_modeled)
     }else{
       chla_inter <- approxfun(init_chla_obs_depths, init_chla_obs, rule=2)
-      PHY_AGGREGATE_init_depth <- chla_inter(modeled_depths)
+      PHY_TCHLA_init_depth <- chla_inter(modeled_depths)
     }
-
+    
     #Initialize DOC usind data if avialable
     if(length(!is.na(init_doc_obs)) == 0){
       OGM_doc_init_depth <- rep(OGM_doc_init, ndepths_modeled) 
@@ -784,25 +1025,26 @@ run_flare<-function(start_day_local,
     PHS_frp_ads_init_depth <- rep(PHS_frp_ads_init, ndepths_modeled)
     
     wq_init_vals <- c(OXY_oxy_init_depth,
-                              CAR_pH_init_depth,
-                              CAR_dic_init_depth,
-                              CAR_ch4_init_depth,
-                              SIL_rsi_init_depth,
-                              NIT_amm_init_depth,
-                              NIT_nit_init_depth,
-                              PHS_frp_init_depth,
-                              OGM_doc_init_depth,
-                              OGM_poc_init_depth,
-                              OGM_don_init_depth,
-                              OGM_pon_init_depth,
-                              OGM_dop_init_depth,
-                              OGM_pop_init_depth,
-                              NCS_ss1_init_depth,
-                              PHS_frp_ads_init_depth,
-                              PHY_AGGREGATE_init_depth)
+                      CAR_pH_init_depth,
+                      CAR_dic_init_depth,
+                      CAR_ch4_init_depth,
+                      SIL_rsi_init_depth,
+                      NIT_amm_init_depth,
+                      NIT_nit_init_depth,
+                      PHS_frp_init_depth,
+                      OGM_doc_init_depth,
+                      OGM_poc_init_depth,
+                      OGM_don_init_depth,
+                      OGM_pon_init_depth,
+                      OGM_dop_init_depth,
+                      OGM_pop_init_depth,
+                      NCS_ss1_init_depth,
+                      PHS_frp_ads_init_depth,
+                      PHY_TCHLA_init_depth
+    )
     
     #UPDATE NML WITH INITIAL CONDITIONS
-
+    
   }else if(!include_wq & is.na(restart_file)){
     #UPDATE NML WITH INITIAL CONDITIONS
     wq_init_vals <- c(" ")
@@ -822,7 +1064,7 @@ run_flare<-function(start_day_local,
   
   #update_var(wq_init_vals, "wq_init_vals", working_directory, "glm3.nml") #GLM SPECIFIC
   if(include_wq){
-    update_var(num_wq_vars, "num_wq_vars", working_directory, "glm3.nml") #GLM SPECIFIC
+    update_var(num_wq_vars - 1 + length(tchla_components_vars), "num_wq_vars", working_directory, "glm3.nml") #GLM SPECIFIC
   }else{
     update_var(0, "num_wq_vars", working_directory, "glm3.nml") #GLM SPECIFIC
   }
@@ -876,16 +1118,18 @@ run_flare<-function(start_day_local,
   if(restart_present){
     nc <- nc_open(restart_file)
     qt <- ncvar_get(nc, "qt_restart")
+    running_residuals <- ncvar_get(nc, "running_residuals")
     qt_pars <- matrix(data = 0, nrow = npars, ncol = npars)
     diag(qt_pars) <- par_init_qt
     nc_close(nc)
     qt_init <- qt
   }else{
     qt <- matrix(data = 0, nrow = ndepths_modeled, ncol = ndepths_modeled)
+
     diag(qt) <- rep(temp_process_error,ndepths_modeled )
     qt_init <- matrix(data = 0, nrow = ndepths_modeled, ncol = ndepths_modeled)
-    diag(qt_init) <- rep(temp_init_error,ndepths_modeled )
-
+    diag(qt_init) <- rep(temp_init_error,ndepths_modeled)
+    
     if(include_wq){
       wq_var_error <- c(OXY_oxy_process_error,
                         CAR_pH_process_error,
@@ -903,7 +1147,7 @@ run_flare<-function(start_day_local,
                         OGM_pop_process_error,
                         NCS_ss1_process_error,
                         PHS_frp_ads_process_error,
-                        PHY_AGGREGATE_process_error)
+                        PHY_TCHLA_process_error)
       
       wq_var_init_error <- c(OXY_oxy_init_error,
                              CAR_pH_init_error,
@@ -921,7 +1165,7 @@ run_flare<-function(start_day_local,
                              OGM_pop_init_error,
                              NCS_ss1_init_error,
                              PHS_frp_ads_init_error,
-                             PHY_AGGREGATE_init_error) 
+                             PHY_TCHLA_init_error) 
       
       for(i in 1:num_wq_vars){
         for(j in 1:ndepths_modeled){
@@ -935,7 +1179,9 @@ run_flare<-function(start_day_local,
         }
       }
     }
-
+    
+    running_residuals <- array(NA, dim =c(num_adapt_days, nrow(qt)))
+    
     #Covariance matrix for parameters
     if(npars > 0){
       for(pars in 1:npars){
@@ -961,6 +1207,21 @@ run_flare<-function(start_day_local,
   
   x <- array(NA, dim=c(nsteps, nmembers, nstates + npars))
   
+  
+  
+  #Matrix to store essemble specific surface height
+  surface_height <- array(NA, dim=c(nsteps, nmembers))
+  snow_ice_thickness <- array(NA, dim=c(nsteps, nmembers, 3))
+  avg_surf_temp <- array(NA, dim=c(nsteps, nmembers))
+  
+  mixing_vars <- array(NA, dim=c(nmembers, 17))
+  
+  if(include_wq){
+    x_phyto_groups <- array(NA, dim = c(nsteps, nmembers, num_phytos * ndepths_modeled))
+  }else{
+    x_phyto_groups <- NA
+  }
+  
   #Initial conditions
   if(!restart_present){
     if(include_wq){
@@ -969,6 +1230,17 @@ run_flare<-function(start_day_local,
                                     mean=c(the_temps_init, 
                                            wq_init_vals), 
                                     sigma=as.matrix(qt_init[1:nstates,1:nstates]))
+      
+        #for(m in 1:nmembers){
+        #  orig_temp <-  x[1,m ,1:ndepths_modeled]
+        #  dens <- rep(NA, ndepths_modeled)
+        #  for(d in 1:ndepths_modeled){
+        #    dens[d] <- temperature_to_density(orig_temp[d], the_sals_init[d])
+        #  }
+        #  index <- order(dens, decreasing = TRUE)
+        #  x[1,m ,1:ndepths_modeled] <- orig_temp[index]
+        #}
+        
         if(single_run){
           for(m in 1:nmembers){
             x[1,m ,1:nstates] <- rep(c(the_temps_init, 
@@ -996,10 +1268,27 @@ run_flare<-function(start_day_local,
             x[1, m, ] <- state_means
           }
         }
+        
+        for(phyto in 1:num_phytos){
+          for(m in 1:nmembers){
+            x_phyto_groups[1,m , ((phyto-1)*ndepths_modeled + 1):(phyto*ndepths_modeled)] <- x[1, m,wq_start[num_wq_vars]:wq_end[num_wq_vars]] * biomass_to_chla[phyto] * init_phyto_proportion[phyto]
+          }
+        }
+        
       }else{
         x[1, ,1:nstates] <- rmvnorm(n=nmembers, 
                                     mean=c(the_temps_init,wq_init_vals),
                                     sigma=as.matrix(qt))
+        
+        #for(m in 1:nmembers){
+        #  orig_temp <-  x[1, m,1:ndepths_modeled]
+        #  dens <- rep(NA, ndepths_modeled)
+        #  for(d in 1:ndepths_modeled){
+        #    dens[d] <- temperature_to_density(orig_temp[d], the_sals_init[d])
+        #  }
+        #  index <- order(dens, decreasing = TRUE)
+        #  x[1,m ,1:nstates] <- orig_temp[index]
+        #}
         
         if(single_run){
           for(m in 1:nmembers){
@@ -1015,11 +1304,27 @@ run_flare<-function(start_day_local,
           }
         }
       }
+      
+      for(phyto in 1:num_phytos){
+        for(m in 1:nmembers){
+          x_phyto_groups[1,m , ((phyto-1)*ndepths_modeled + 1):(phyto*ndepths_modeled)] <- x[1, m,wq_start[num_wq_vars]:wq_end[num_wq_vars]] * biomass_to_chla[phyto] * init_phyto_proportion[phyto]
+        }
+      }
     }else{
       if(npars > 0){
         x[1, ,1:nstates] <- rmvnorm(n=nmembers, 
                                     mean=c(the_temps_init), 
                                     sigma=as.matrix(qt_init[1:nstates,1:nstates]))
+        
+        for(m in 1:nmembers){
+          orig_temp <-  x[1,m ,1:ndepths_modeled]
+          dens <- rep(NA, ndepths_modeled)
+          for(d in 1:ndepths_modeled){
+            dens[d] <- temperature_to_density(orig_temp[d], the_sals_init)
+          }
+          index <- order(dens, decreasing = TRUE)
+          x[1,m ,1:nstates] <- orig_temp[index]
+        }
         
         
         for(par in 1:npars){
@@ -1039,6 +1344,16 @@ run_flare<-function(start_day_local,
         x[1, , ] <- rmvnorm(n=nmembers, 
                             mean=the_temps_init,
                             sigma=as.matrix(qt))
+        
+        for(m in 1:nmembers){
+          orig_temp <-  x[1,m ,1:ndepths_modeled]
+          dens <- rep(NA, ndepths_modeled)
+          for(d in 1:ndepths_modeled){
+            dens[d] <- temperature_to_density(orig_temp[d], the_sals_init[d])
+          }
+          index <- order(dens, decreasing = TRUE)
+          x[1,m ,1:nstates] <- orig_temp[index]
+        }
         
         if(initial_condition_uncertainty == FALSE & hist_days == 0){
           state_means <- colMeans(x[1, , 1:nstates])
@@ -1069,6 +1384,14 @@ run_flare<-function(start_day_local,
     print("Using restart file")
     nc <- nc_open(restart_file)
     restart_nmembers <- length(ncvar_get(nc, "ens"))
+    surface_height_restart <- ncvar_get(nc, "surface_height_restart")
+    snow_ice_thickness_restart <- ncvar_get(nc, "snow_ice_restart")
+    avg_surf_temp_restart <- ncvar_get(nc, "avg_surf_temp_restart")
+    mixing_restart <- ncvar_get(nc, "mixing_restart")
+    
+    if(include_wq){
+      x_phyto_groups_restart <- ncvar_get(nc, "phyto_restart")
+    }
     if(restart_nmembers > nmembers){
       #sample restart_nmembers
       sampled_nmembers <- sample(seq(1, restart_nmembers, 1),
@@ -1077,6 +1400,20 @@ run_flare<-function(start_day_local,
       restart_x_previous <- ncvar_get(nc, "x_restart")
       x_previous <- restart_x_previous[sampled_nmembers, ]
       
+      snow_ice_thickness[1, , 1] <- snow_ice_thickness_restart[sampled_nmembers, 1]
+      snow_ice_thickness[1, , 2] <- snow_ice_thickness_restart[sampled_nmembers, 2]
+      snow_ice_thickness[1, , 3] <- snow_ice_thickness_restart[sampled_nmembers, 3]
+      
+      surface_height[1, ] <- surface_height_restart[sampled_nmembers]
+      avg_surf_temp[1, ] <- avg_surf_temp_restart[sampled_nmembers]
+      mixing_vars <- mixing_restart[sampled_nmembers, ]
+      
+      if(include_wq){
+        for(phyto in 1:num_phytos){
+          x_phyto_groups[1, ,((phyto-1)*ndepths_modeled):(phyto*ndepths_modeled)] <- x_phyto_groups_restart[sampled_nmembers , ((phyto-1)*ndepths_modeled):(phyto*ndepths_modeled)]
+        }
+      }
+      
     }else if(restart_nmembers < nmembers){
       sampled_nmembers <- sample(seq(1, restart_nmembers, 1),
                                  nmembers,
@@ -1084,9 +1421,36 @@ run_flare<-function(start_day_local,
       restart_x_previous <- ncvar_get(nc, "x_restart")
       x_previous <- restart_x_previous[sampled_nmembers, ]
       
+      snow_ice_thickness[1, ,1] <- snow_ice_thickness_restart[sampled_nmembers, 1]
+      snow_ice_thickness[1, ,2] <- snow_ice_thickness_restart[sampled_nmembers, 2]
+      snow_ice_thickness[1, ,3] <- snow_ice_thickness_restart[sampled_nmembers, 3]
+      
+      surface_height[1, ] <- surface_height_restart[sampled_nmembers]
+      avg_surf_temp[1, ] <- avg_surf_temp_restart[sampled_nmembers]
+      mixing_vars <- mixing_restart[sampled_nmembers, ]
+      
+      if(include_wq){
+        for(phyto in 1:num_phytos){
+          x_phyto_groups[1, ,((phyto-1)*ndepths_modeled):(phyto*ndepths_modeled)] <- x_phyto_groups_restart[sampled_nmembers , ((phyto-1)*ndepths_modeled):(phyto*ndepths_modeled)]
+        }
+      }
+      
     }else{
       restart_x_previous <- ncvar_get(nc, "x_restart")
       x_previous <- restart_x_previous
+      snow_ice_thickness[1, ,1] <- snow_ice_thickness_restart[, 1]
+      snow_ice_thickness[1, ,2] <- snow_ice_thickness_restart[, 2]
+      snow_ice_thickness[1, ,3] <- snow_ice_thickness_restart[, 3]
+      
+      surface_height[1, ] <- surface_height_restart
+      avg_surf_temp[1, ] <- avg_surf_temp_restart
+      mixing_vars <- mixing_restart
+      
+      if(include_wq){
+        for(phyto in 1:num_phytos){
+          x_phyto_groups[1, ,((phyto-1)*ndepths_modeled):(phyto*ndepths_modeled)] <- x_phyto_groups_restart[ , ((phyto-1)*ndepths_modeled):(phyto*ndepths_modeled)]
+        }
+      }
       
     }
     nc_close(nc)
@@ -1095,6 +1459,19 @@ run_flare<-function(start_day_local,
                                   year(full_time_local[1]), "_",
                                   month(full_time_local[1]), "_",
                                   day(full_time_local[1]), "_cold.csv"))
+    
+    
+    surface_height[1, ] <- round(lake_depth_init, 3)
+    
+    #Matrix to store snow and ice heights
+    snow_ice_thickness[1, ,1] <- default_snow_thickness_init
+    snow_ice_thickness[1, ,2] <- default_white_ice_thickness_init
+    snow_ice_thickness[1, ,3] <- default_blue_ice_thickness_init
+    
+    avg_surf_temp[1, ] <- x[1, ,1]
+    
+    mixing_vars[,] <- 0.0
+    
   }
   
   #Set initial conditions
@@ -1120,9 +1497,6 @@ run_flare<-function(start_day_local,
   }
   
   
-  #Matrix to store essemble specific surface height
-  surface_height <- array(NA, dim=c(nsteps, nmembers))
-  surface_height[1, ] <- round(lake_depth_init, 3)
   
   ####################################################
   #### STEP 12: Run Ensemble Kalman Filter
@@ -1156,12 +1530,29 @@ run_flare<-function(start_day_local,
                           inflow_file_names,
                           outflow_file_names,
                           management_input,
-                          forecast_sss_on)
+                          forecast_sss_on,
+                          snow_ice_thickness,
+                          avg_surf_temp,
+                          running_residuals,
+                          the_sals_init,
+                          mixing_vars 
+  )
   
   x <- enkf_output$x
   x_restart <- enkf_output$x_restart
   qt_restart <- enkf_output$qt_restart
   x_prior <- enkf_output$x_prior
+  surface_height_restart <- enkf_output$surface_height_restart
+  snow_ice_restart <- enkf_output$snow_ice_restart
+  snow_ice_thickness <- enkf_output$snow_ice_thickness
+  surface_height <- enkf_output$surface_height
+
+  x_phyto_groups_restart <- enkf_output$x_phyto_groups_restart
+  x_phyto_groups <- enkf_output$x_phyto_groups
+  running_residuals <- enkf_output$running_residuals
+  
+  avg_surf_temp_restart <- enkf_output$avg_surf_temp_restart
+  mixing_restart <- enkf_output$mixing_restart
   
   ####################################################
   #### STEP 13: PROCESS OUTPUT
@@ -1226,7 +1617,16 @@ run_flare<-function(start_day_local,
                         npars,
                         GLMversion,
                         FLAREversion,
-                        local_tzone)
+                        local_tzone,
+                        surface_height_restart,
+                        snow_ice_restart,
+                        snow_ice_thickness,
+                        surface_height,
+                        avg_surf_temp_restart,
+                        x_phyto_groups_restart,
+                        x_phyto_groups,
+                        running_residuals,
+                        mixing_restart)
   
   ##ARCHIVE FORECAST
   restart_file_name <- archive_forecast(working_directory = working_directory,
