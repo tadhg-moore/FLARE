@@ -73,10 +73,10 @@ process_downscale_GEFS <- function(folder,
                   WindSpeed = ifelse(WindSpeed <0, 0, WindSpeed)) %>%
                   filter(is.na(timestamp) == FALSE)
 
-  observations$RelHum <- na.interpolation(observations$RelHum)
-  observations$AirTemp <- na.interpolation(observations$AirTemp)
-  observations$LongWave <- na.interpolation(observations$LongWave)
-  observations$WindSpeed <- na.interpolation(observations$WindSpeed)
+  observations$RelHum <- na_interpolation(observations$RelHum)
+  observations$AirTemp <- na_interpolation(observations$AirTemp)
+  observations$LongWave <- na_interpolation(observations$LongWave)
+  observations$WindSpeed <- na_interpolation(observations$WindSpeed)
   
   rm(obs.data)
   hrly.obs <- observations %>% aggregate_obs_to_hrly()
@@ -122,7 +122,7 @@ process_downscale_GEFS <- function(folder,
   output = met_forecast_output[[2]]
   if(compare_output_to_obs == TRUE){
     "comparing forecast output to obs"
-    compare_output_to_obs(output, hrly.obs)
+    compare_output_to_obs(output, hrly.observations = hrly.obs)
   }
   return(files)
 }

@@ -73,7 +73,7 @@ fit_downscaling_parameters <- function(observations,
   VarNamesStates <- VarInfo %>%
     filter(VarType == "State")
   VarNamesStates <- VarNamesStates$VarNames
-  states.ds.hrly <- spline_to_hourly(redistributed,
+  states.ds.hrly <- spline_to_hourly(df = redistributed,
                                     VarNamesStates = VarNamesStates)
   # if filtering out incomplete days, that would need to happen here
   
