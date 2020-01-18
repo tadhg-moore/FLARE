@@ -3,7 +3,7 @@
 
 
 extract_temp_chain <- function(fname,
-                               full_time_local, 
+                               full_time_GMT, 
                                modeled_depths = modeled_depths,
                                observed_depths_temp = observed_depths_temp,
                                input_file_tz, 
@@ -17,7 +17,7 @@ extract_temp_chain <- function(fname,
     
     d2 <- read.csv(fname[2], na.strings = 'NA', stringsAsFactors = FALSE)
     
-    obs <- array(NA,dim=c(length(full_time_local),length(modeled_depths)))
+    obs <- array(NA,dim=c(length(full_time_GMT),length(modeled_depths)))
     depths_w_obs <- observed_depths_temp
     obs_index <-   rep(NA,length(depths_w_obs))
     for(i in 1:length(depths_w_obs)){
@@ -40,9 +40,9 @@ extract_temp_chain <- function(fname,
     
     d <- rbind(d3,d4)
     
-    full_time_local <- as.POSIXct(full_time_local,tz = local_tzone)
-    for(i in 1:length(full_time_local)){
-      index = which(d$TIMESTAMP==full_time_local[i])
+    full_time_GMT <- as.POSIXct(full_time_GMT,tz = 'GMT')
+    for(i in 1:length(full_time_GMT)){
+      index = which(d$TIMESTAMP==full_time_GMT[i])
       if(length(index)>0){
         obs[i,obs_index] <- unlist(d[index,2:11])
         if(is.na(obs[i,obs_index[2]]) & !is.na(d[index,"wtr_1_exo"])){
@@ -59,34 +59,35 @@ extract_temp_chain <- function(fname,
     
   }else{
     #Different lakes are going to have to modify this for their temperature data format
-    d <- read.csv(fname[1], skip = 4, na.strings = 'NAN', stringsAsFactors = FALSE)
-    d_names <- read.csv(fname, skip =1, stringsAsFactors = FALSE)
-    names(d) <- names(d_names)
+    d <- read.csv(fname[1], stringsAsFactors = FALSE)
+    # d_names <- read.csv(fname, skip =0, stringsAsFactors = FALSE)
+    # names(d) <- names(d_names)
     
-    obs <- array(NA,dim=c(length(full_time_local),length(modeled_depths)))
+    obs <- array(NA,dim=c(length(full_time_GMT),length(modeled_depths)))
     depths_w_obs <- observed_depths_temp
     obs_index <-   rep(NA,length(depths_w_obs))
     for(i in 1:length(depths_w_obs)){
       obs_index[i] <- which.min(abs(modeled_depths - depths_w_obs[i]))
     }
     
-    TIMESTAMP_in <- as_datetime(d$TIMESTAMP,tz = input_file_tz)
-    d$TIMESTAMP <- with_tz(TIMESTAMP_in,tz = local_tzone)
+    TIMESTAMP_in <- as_datetime(d$DateTime,tz = input_file_tz)
+    d$TIMESTAMP <- with_tz(TIMESTAMP_in,tz = 'GMT')
     
-    full_time_local <- as.POSIXct(full_time_local,tz = local_tzone)
-    for(i in 1:length(full_time_local)){
-      index = which(d$TIMESTAMP==full_time_local[i])
+    # Extract time 11 hours into the future from forecast date
+    full_time_out <- as.POSIXct(full_time_GMT,tz = 'GMT') + 11 * 60*60
+    for(i in 1:length(full_time_out)){
+      index = which(d$TIMESTAMP==full_time_out[i])
       if(length(index)>0){
-        obs[i,obs_index] <- unlist(d[index,5:14])
-        if(is.na(obs[i,obs_index[2]]) & !is.na(d[index,23])){
-          obs[i,obs_index[2]] <- d[index,23]
-        }
-        if(is.na(obs[i,obs_index[6]]) & !is.na(d[index,17])){
-          obs[i,obs_index[6]] <- d[index,17]
-        }
-        if(is.na(obs[i,obs_index[10]]) & !is.na(d[index,20])){ 
-          obs[i,obs_index[10]] <- d[index,20]
-        }
+        obs[i,obs_index] <- unlist(d[index,7:16])
+        # if(is.na(obs[i,obs_index[2]]) & !is.na(d[index,23])){
+        #   obs[i,obs_index[2]] <- d[index,23]
+        # }
+        # if(is.na(obs[i,obs_index[6]]) & !is.na(d[index,17])){
+        #   obs[i,obs_index[6]] <- d[index,17]
+        # }
+        # if(is.na(obs[i,obs_index[10]]) & !is.na(d[index,20])){ 
+        #   obs[i,obs_index[10]] <- d[index,20]
+        # }
       }
     }
   }

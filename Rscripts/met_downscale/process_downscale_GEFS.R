@@ -49,6 +49,7 @@ process_downscale_GEFS <- function(folder,
   
   obs.data$timestamp <- force_tz(obs.data$timestamp, tz = local_tzone)
   
+  
   VarNames = as.vector(VarInfo$VarNames)
   
   observations <- obs.data %>% 
@@ -56,12 +57,14 @@ process_downscale_GEFS <- function(folder,
                   Rain = Rain* 60 * 24/1000)
     
   observations$RelHum <- na_interpolation(observations$RelHum)
+  observations$airp <- na_interpolation(observations$airp)
   observations$AirTemp <- na_interpolation(observations$AirTemp)
   observations$LongWave <- na_interpolation(observations$LongWave)
   observations$WindSpeed <- na_interpolation(observations$WindSpeed)
 
   rm(obs.data)
   hrly.obs <- observations %>% aggregate_obs_to_hrly()
+  
   
   # -----------------------------------
   # 1. Fit Parameters
@@ -105,7 +108,7 @@ process_downscale_GEFS <- function(folder,
   output = met_forecast_output[[2]]
   if(compare_output_to_obs == TRUE){
     "comparing forecast output to obs"
-    compare_output_to_obs(output, hrly.observations = hrly.obs)
+    compare_output_to_obs(output, hrly.obs)
   }
   return(files)
 }

@@ -54,7 +54,7 @@ process_GEFS <- function(file_name,
   
   #full_time_local <- seq(begin_step, end_step, by = "1 hour", tz = local_tzone) # grid
   
-  forecasts <- prep_for(d, input_tz = for.input_tz, local_tzone, weather_uncertainty)
+  forecasts <- prep_for(NOAA.data = d, input_tz = for.input_tz, local_tzone, weather_uncertainty)
   
   time0 = min(forecasts$timestamp)
   time_end = max(forecasts$timestamp)
@@ -140,18 +140,32 @@ process_GEFS <- function(file_name,
     write_file <- function(df){
       # formats GLM_climate, writes it as a .csv file, and returns the filename
       GLM_climate <- df %>% plyr::rename(c("timestamp" = "full_time_local")) %>%
-        select(full_time_local, ShortWave, LongWave, AirTemp, RelHum, WindSpeed, Rain, Snow)
-      GLM_climate[,"full_time_local"] = strftime(GLM_climate$full_time_local, format="%Y-%m-%d %H:%M", tz = attributes(GLM_climate$full_time_local)$tzone)
-      colnames(GLM_climate) =  noquote(c("time", 
-                                         "ShortWave",
-                                         "LongWave",
-                                         "AirTemp",
-                                         "RelHum",
-                                         "WindSpeed",
-                                         "Rain",
-                                         "Snow"))
-      current_filename = paste0('met_hourly_',file_name,'_NOAA',NOAA.ens,'_ds',dscale.ens,'.csv')
-      write.csv(GLM_climate,file = paste0(out_directory, "/", current_filename), row.names = FALSE, quote = FALSE)
+        select(full_time_local, ShortWave, LongWave, AirTemp, RelHum, airp, WindSpeed, Rain, Snow)
+      GLM_climate[,"full_time_local"] = strftime(GLM_climate$full_time_local, format="%Y-%m-%d %H:%M:%S", tz = 'GMT')
+      
+      GLM_climate$Cloud <- gotmtools::calc_cc(date = GLM_climate$full_time_local, airt = GLM_climate$AirTemp, relh = GLM_climate$RelHum, swr = GLM_climate$ShortWave, lat = lake_latitude, lon = lake_longitude, elev = lake_elevation)
+      
+      # Convert Rain from m/day to m/s
+      GLM_climate$Rain <- GLM_climate$Rain/86400
+      
+      GLM_climate <- data.frame('DateTime' = format(GLM_climate$full_time_local, format = '%Y-%m-%d %H:%M:%S'),
+                                   'u10' = GLM_climate$WindSpeed,
+                                   'v10' = 0,
+                                   'airp' = GLM_climate$airp,
+                                   'airt' = GLM_climate$AirTemp,
+                                   'relh' = GLM_climate$RelHum,
+                                   'cloud' = GLM_climate$Cloud,
+                                   'swr' = GLM_climate$ShortWave,
+                                   'precip' = GLM_climate$Rain)
+      
+      # Reduce numbers
+      GLM_climate[,-1] <- signif(GLM_climate[,-1])
+      
+      
+      colnames(GLM_climate)[1] = '!DateTime' 
+      current_filename = paste0('met_hourly_',file_name,'_NOAA',NOAA.ens,'_ds',dscale.ens,'.dat')
+      # write.csv(GLM_climate,file = paste0(out_directory, "/", current_filename), row.names = FALSE, quote = FALSE)
+      write.table(GLM_climate, file = paste0(out_directory, "/", current_filename), row.names = FALSE, quote = FALSE, sep = '\t', col.names = TRUE)
       return(current_filename)
     }
     

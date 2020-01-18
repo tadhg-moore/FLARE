@@ -15,31 +15,29 @@ library(imputeTS)
 library(tidyverse)
 library(tools)
 
-data_location = "C:\\Users\\mooret\\Desktop\\flare_feeagh\\fcr_data/"
-code_folder <- "C:\\Users\\mooret\\Desktop\\flare_feeagh\\FLARE/"
-forecast_location <- "C:\\Users\\mooret\\Desktop\\flare_feeagh\\fcr_fc_out/"
-file.copy(from = "C:\\Users\\mooret\\Desktop\\flare_feeagh\\FLARE/configure_FLARE_example.R", to = paste0(forecast_location,"/","configure_FLARE.R"))
+data_location <<- "C:\\Users\\mooret\\Desktop\\flare_feeagh/fcr_data/"
+code_folder <<- "C:\\Users\\mooret\\Desktop\\flare_feeagh/FLARE_gotm/"
+forecast_location <<- "C:\\Users\\mooret\\Desktop\\flare_feeagh/gotm_fc/"
+execute_location <<- "C:\\Users\\mooret\\Desktop\\flare_feeagh\\FLARE_gotm\\gotm\\windows"
+
+file.copy(paste0(code_folder, 'configure_FLARE-gotm.R'), paste0(forecast_location, 'configure_FLARE.R'), overwrite = T)
 
 source(paste0(forecast_location,"/","configure_FLARE.R"))
 source(paste0(code_folder, "/", "Rscripts/run_flare.R"))
 source(paste0(code_folder, "/", "Rscripts/plot_forecast.R"))
 
-Sys.setenv(https_proxy = "http://proxy.dkit.ie:3128")
 
-# restart_file <- "/Users/quinn/Dropbox/Research/SSC_forecasting/testing_AED/test1_H_2018_10_12_2018_10_22_F_0_2019623_16_22.nc"
+
+
 restart_file <- NA
 
-sim_name <- "test" 
+sim_name <- "test_log_kmin" 
 forecast_days <- 16
 spin_up_days <- 0
-sim_name <- "test1_woaed" 
-start_day_local <- "2019-05-05"  #Note: 2018-07-16 is the first day with CTD observations for initial conditions
-start_time_local <- "13:00:00"
-forecast_start_day_local <- "2019-05-10" 
 
-start_day_local <- "2019-09-20"  #Note: 2018-07-16 is the first day with CTD observations for initial conditions
-start_time_local <- "07:00:00"
-forecast_start_day_local <- "2019-09-22" 
+start_day_local <- "2019-04-25"  #Note: 2018-07-16 is the first day with CTD observations for initial conditions
+start_time_local <- "13:00:00"
+forecast_start_day_local <- "2019-04-30" 
 
 start_day_local <- as.POSIXct(start_day_local, format = "%Y-%m-%d")
 forecast_start_day_local <- as.POSIXct(forecast_start_day_local, format = "%Y-%m-%d")
@@ -66,10 +64,9 @@ out <- run_flare(start_day_local,
                  include_wq = include_wq,
                  use_ctd = use_ctd,
                  uncert_mode = uncert_mode,
-                 # reference_tzone = reference_tzone,
                  cov_matrix = cov_matrix,
                  downscaling_coeff = downscaling_coeff,
-                 GLMversion = GLMversion,
+                 model_version = model_version,
                  DOWNSCALE_MET = DOWNSCALE_MET,
                  FLAREversion = FLAREversion,
                  met_ds_obs_start = met_ds_obs_start,

@@ -19,6 +19,9 @@ process_saved_forecasts <- function(data.path,working_directory, local_tzone){
   # 0. Load data, initialize variables
   # -----------------------------------
   forecast.files.list = list.files(data.path, "*00z.csv")
+  # if(first_obs_date >= '2018-10-01'){
+  #   forecast.files.list = forecast.files.list[-c(1:152)]
+  # }
   flux.forecasts = NULL
   state.forecasts = NULL
   for(i in 1:length(forecast.files.list)){
@@ -26,6 +29,9 @@ process_saved_forecasts <- function(data.path,working_directory, local_tzone){
     if(as_datetime(tmp.data$forecast.date[1]) < as_datetime('2018-12-07 00:00:00')){
       input_tz = "EST5EDT"
     }else{input_tz = "GMT"}
+    if(!('pressfc' %in% colnames(tmp.data))){
+      next
+    }
     #input_tz = "GMT"
     tmp.data <- tmp.data %>%
       dplyr::mutate(forecast.date = as_datetime(forecast.date, tz = input_tz))
@@ -33,7 +39,7 @@ process_saved_forecasts <- function(data.path,working_directory, local_tzone){
     tmp.min.time = min(tmp.data$forecast.date)
     tmp.state <- tmp.data %>%
       filter(forecast.date <= tmp.min.time + 18*60*60) %>%
-      select(ensembles, tmp2m, rh2m, vgrd10m, ugrd10m, forecast.date)
+      select(ensembles, tmp2m, rh2m, vgrd10m, ugrd10m, pressfc, forecast.date)
     tmp.flux <- tmp.data %>%
       filter(forecast.date <= tmp.min.time + 24*60*60 & forecast.date > tmp.min.time) %>%
       select(ensembles, forecast.date,pratesfc, dlwrfsfc, dswrfsfc)

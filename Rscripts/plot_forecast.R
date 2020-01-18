@@ -111,19 +111,18 @@ plot_forecast <- function(pdf_file_name,
                                input_file_tz = "EST5EDT", 
                                local_tzone)
   
-  obs_nutrients <- extract_nutrients(fname = nutrients_fname,
-                                     full_time_day_local,
-                                     modeled_depths = modeled_depths,
-                                     input_file_tz = "EST5EDT", 
-                                     local_tzone)
+  # obs_nutrients <- extract_nutrients(fname = nutrients_fname,
+  #                                    full_time_day_local,
+  #                                    modeled_depths = modeled_depths,
+  #                                    input_file_tz = "EST5EDT", 
+  #                                    local_tzone)
   
   #Combine fdom and nutrients
-  for(i in 1:length(full_time_day_local)){
-    if(length(which(!is.na(obs_nutrients$DOC[i,]))) > 0){
-      obs_fdom$obs[i,which(is.na(obs_fdom$obs[i,]))] <- obs_nutrients$DOC[i,which(is.na(obs_fdom$obs[i,]))]
-    }
-  }
-  
+  # for(i in 1:length(full_time_day_local)){
+  #   if(length(which(!is.na(obs_nutrients$DOC[i,]))) > 0){
+  #     obs_fdom$obs[i,which(is.na(obs_fdom$obs[i,]))] <- obs_nutrients$DOC[i,which(is.na(obs_fdom$obs[i,]))]
+  #   }
+  # }
   
   #Use the CTD observation rather than the sensor string when CTD data is avialable
   if(use_ctd){
@@ -248,7 +247,12 @@ plot_forecast <- function(pdf_file_name,
   par(mfrow=c(4,3))
   if(npars > 0){
     for(par in 1:npars){
-      plot(full_time_local,rowMeans(par_list[[par]][,]),xlab ='Day',ylab = par_names_save[par],type='l',ylim = range(c(par_list[[par]][,]),na.rm=TRUE))
+      if(par_log[par]){
+        plot(full_time_local,rowMeans(par_list[[par]][,]),xlab ='Day',ylab = par_names_save[par],type='l',ylim = range(c(par_list[[par]][,]),na.rm=TRUE), log = 'y')
+      }else{
+        plot(full_time_local,rowMeans(par_list[[par]][,]),xlab ='Day',ylab = par_names_save[par],type='l',ylim = range(c(par_list[[par]][,]),na.rm=TRUE))
+      }
+      
       if(length(par_list[[par]][1,]) > 1){
         for(m in 1:length(par_list[[par]][1,])){
           points(full_time_local,par_list[[par]][,m],type='l')

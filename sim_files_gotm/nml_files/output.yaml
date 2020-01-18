@@ -1,0 +1,11 @@
+output:
+   format: netcdf
+   time_method: mean
+   time_step: 1
+   time_unit: day
+   variables:
+      - source: temp 
+      - source: qe
+      - source: qh
+      - source: qb
+      - source: albedo      

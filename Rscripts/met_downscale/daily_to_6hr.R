@@ -1,4 +1,4 @@
-daily_to_6hr <- function(forecasts, daily.forecast, debiased, VarNames){
+daily_to_6hr <- function(forecasts, daily.forecast, debiased, VarNames, fit_ds_param = FALSE){
   grouping = c("NOAA.member")
   if("fday.group" %in% colnames(forecasts)){
     grouping = append(grouping, "fday.group")
@@ -23,7 +23,11 @@ daily_to_6hr <- function(forecasts, daily.forecast, debiased, VarNames){
     redistributed[,VarNames[Var]] = redistributed[,VarNames[Var]] * redistributed[,paste0(VarNames[Var], ".prop")]
   }
   
-  redistributed <- redistributed %>% select(NOAA.member, timestamp, VarNames, dscale.member)
+  if(fit_ds_param){
+    redistributed <- redistributed %>% select(NOAA.member, timestamp, VarNames)
+  }else{
+    redistributed <- redistributed %>% select(NOAA.member, timestamp, VarNames, dscale.member)
+  }
   
   return(redistributed)
 }

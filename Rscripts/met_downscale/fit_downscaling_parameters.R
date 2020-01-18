@@ -58,12 +58,13 @@ fit_downscaling_parameters <- function(observations,
   debiased.coefficients <-  out[[1]]
   debiased.covar <-  out[[2]]
   
-   debiased <- daily_debias_from_coeff(daily.forecast, debiased.coefficients, VarInfo)
+  debiased <- daily_debias_from_coeff(daily.forecast, debiased.coefficients, VarInfo)
   
   # -----------------------------------
   # 5.a. temporal downscaling step (a): redistribute to 6-hourly resolution
   # -----------------------------------
-  redistributed <- daily_to_6hr(forecasts, daily.forecast, debiased, VarNames = VarInfo$VarNames)
+  fit_ds_param = TRUE
+  redistributed <- daily_to_6hr(forecasts, daily.forecast, debiased, VarNames = VarInfo$VarNames, fit_ds_param = fit_ds_param)
   
   # -----------------------------------
   # 5.b. temporal downscaling step (b): temporally downscale from 6-hourly to hourly
@@ -88,7 +89,8 @@ fit_downscaling_parameters <- function(observations,
   
   
   ## downscale shortwave to hourly
-  ShortWave.ds <- ShortWave_to_hrly(debiased, time0 = NA, lat = lake_latitude, lon = 360 - lake_longitude, local_tzone)
+  
+  ShortWave.ds <- ShortWave_to_hrly(debiased, time0 = debiased[1,1], lat = lake_latitude, lon = 360 - lake_longitude, local_tzone, ds = TRUE)
   
   # -----------------------------------
   # 6. join debiased forecasts of different variables into one dataframe
@@ -132,13 +134,17 @@ fit_downscaling_parameters <- function(observations,
   debiased.coefficients[5,3] <- sd(residuals(model))
   debiased.coefficients[6,3] <- summary(model)$r.squared
   
-  model <- lm(joined.hrly.obs.and.ds$ShortWave.obs ~ joined.hrly.obs.and.ds$ShortWave.ds)
+  model <- lm(joined.hrly.obs.and.ds$airp.obs ~ joined.hrly.obs.and.ds$airp.ds)
   debiased.coefficients[5,4] <- sd(residuals(model))
   debiased.coefficients[6,4] <- summary(model)$r.squared
   
-  model <- lm(joined.hrly.obs.and.ds$LongWave.obs ~ joined.hrly.obs.and.ds$LongWave.ds)
+  model <- lm(joined.hrly.obs.and.ds$ShortWave.obs ~ joined.hrly.obs.and.ds$ShortWave.ds)
   debiased.coefficients[5,5] <- sd(residuals(model))
   debiased.coefficients[6,5] <- summary(model)$r.squared
+  
+  model <- lm(joined.hrly.obs.and.ds$LongWave.obs ~ joined.hrly.obs.and.ds$LongWave.ds)
+  debiased.coefficients[5,6] <- sd(residuals(model))
+  debiased.coefficients[6,6] <- summary(model)$r.squared
   save(debiased.coefficients,debiased.covar, file = paste(working_directory,"/debiased.coefficients.RData", sep = ""))
   
   print(debiased.coefficients)
@@ -146,7 +152,6 @@ fit_downscaling_parameters <- function(observations,
   # 10. Visual check (comparing observations and downscaled forecast ensemble mean)
   # -----------------------------------
   if(PLOT == TRUE){
-    # pdf(paste0(working_directory, '/met_ds_forecast_average.pdf'), width = 16, height = 9)
     ggplot(data = joined.hrly.obs.and.ds[1:50000,], aes(x = timestamp)) +
       geom_line(aes(y = AirTemp.obs, color = "observations"))+
       geom_line(aes(y = AirTemp.ds, color = "downscaled forecast average", group = NOAA.member))
@@ -163,13 +168,12 @@ fit_downscaling_parameters <- function(observations,
       geom_line(aes(y = ShortWave.obs, color = "observations"))+
       geom_line(aes(y = ShortWave.ds, color = "downscaled forecast average", group = NOAA.member))
     
-    ggplot(data = joined.hrly.obs.and.ds[1:100000,], aes(x = timestamp)) +
+    ggplot(data = joined.hrly.obs.and.ds[1:5000,], aes(x = timestamp)) +
       geom_line(aes(y = LongWave.obs, color = "observations"))+
       geom_line(aes(y = LongWave.ds, color = "downscaled forecast average", group = NOAA.member))
-    ggplot(data = joined.hrly.obs.and.ds[1:100000,], aes(x = timestamp)) +
+    ggplot(data = joined.hrly.obs.and.ds[1:5000,], aes(x = timestamp)) +
       geom_line(aes(y = Rain.obs, color = "observations"))+
       geom_line(aes(y = Rain.ds, color = "downscaled forecast average", group = NOAA.member))
-    # dev.off()
   }
 }
 

@@ -63,6 +63,12 @@ inflow_qaqc <- function(fname,
   
   hist_inflow <- rbind(hist1, hist2) #inflow from 2013-April 2019
   
+  # remove duplicate timestamps
+  dup_ind <- duplicated(hist_inflow[,1])
+  if(sum(dup_ind) > 0){
+    hist_inflow <- hist_inflow[!dup_ind,]
+  }
+  
   ##Step 2: Read in diana data, convert flow from PSI to CSM, calculations to account for building new weir in June 2019 (FCR Specific), and aggregate to daily mean.##
   diana <- read.csv(diana_location, skip=4, header=F)
   diana_headers <- read.csv(diana_location, skip=1, header = F, nrows= 1, as.is=T)

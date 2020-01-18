@@ -228,7 +228,7 @@ get_glm_nc_var_all_wq <- function(ncFile,working_dir, z_out,vars){
   snow <- ncvar_get(glm_nc, "hsnow")[2]
   ice_white <- ncvar_get(glm_nc, "hwice")[2] 
   ice_blue <- ncvar_get(glm_nc, "hice")[2] 
-  avg_surf_temp <- ncvar_get(glm_nc, "avg_surf_temp")[2] 
+  # avg_surf_temp <- ncvar_get(glm_nc, "avg_surf_temp")[2] 
   
 
   output <- array(NA,dim=c(num_dep,length(vars)))
@@ -244,19 +244,20 @@ get_glm_nc_var_all_wq <- function(ncFile,working_dir, z_out,vars){
     
   }
   
-  mixing_restart_variables <- c("dep_mx","prev_thick", "g_prime_two_layer", "energy_avail_max", "mass_epi", 
-                                "old_slope", "time_end_shear", "time_start_shear", "time_count_end_shear", "time_count_sim", 
-                                "half_seiche_period", "thermocline_height", "f0", "fsum", "u_f", "u0", "u_avg")
-  mixing_vars <- rep(NA, length(mixing_restart_variables))
-    for(v in 1:length(mixing_restart_variables)){
-      mixing_vars[v] <- ncvar_get(glm_nc, mixing_restart_variables[v])[2] 
-    }
+  # mixing_restart_variables <- c("dep_mx","prev_thick", "g_prime_two_layer", "energy_avail_max", "mass_epi", 
+  #                               "old_slope", "time_end_shear", "time_start_shear", "time_count_end_shear", "time_count_sim", 
+  #                               "half_seiche_period", "thermocline_height", "f0", "fsum", "u_f", "u0", "u_avg")
+  # mixing_vars <- rep(NA, length(mixing_restart_variables))
+  #   for(v in 1:length(mixing_restart_variables)){
+  #     mixing_vars[v] <- ncvar_get(glm_nc, mixing_restart_variables[v])[2] 
+  #   }
   
   
   nc_close(glm_nc)
   return(list(output = output,
               surface_height = elev_surf[length(tallest_layer), 2],
               snow_wice_bice = c(snow, ice_white, ice_blue),
-              avg_surf_temp = avg_surf_temp,
-              mixing_vars = mixing_vars))
+              avg_surf_temp = avg_surf_temp)#,
+              # mixing_vars = mixing_vars)
+         )
 }

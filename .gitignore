@@ -7,3 +7,4 @@ glm/mac/.DS_Store
 glm/unix/.DS_Store
 glm/windows/.DS_Store
 .Rproj.user
+gotm/windows/working_directory/*

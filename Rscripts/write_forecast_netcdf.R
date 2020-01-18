@@ -21,11 +21,12 @@ write_forecast_netcdf <- function(x,
                                   snow_ice_restart,
                                   snow_ice_thickness,
                                   surface_height,
-                                  avg_surf_temp_restart,
+                                  # avg_surf_temp_restart,
                                   x_phyto_groups_restart,
                                   x_phyto_groups,
-                                  running_residuals,
-                                  mixing_restart){
+                                  running_residuals#,
+                                  # mixing_restart
+                                  ){
   
   obs <- z
   
@@ -40,7 +41,7 @@ write_forecast_netcdf <- function(x,
   states_aug <- seq(1,dim(x)[3],1)
   obs_states <- seq(1,dim(z)[2],1)
   qt_update_days <- seq(1,dim(running_residuals)[1],1)
-  mixing_restart_vars <- seq(1, dim(mixing_restart)[2], 1)
+  # mixing_restart_vars <- seq(1, dim(mixing_restart)[2], 1)
   if(include_wq){
     phytos_restart <- seq(1, dim(x_phyto_groups_restart)[2],1)
   }
@@ -72,7 +73,7 @@ write_forecast_netcdf <- function(x,
   obsdim <- ncdim_def("obs_dim",units = '', vals = obs_states, longname = 'length of ')
   snow_ice_dim <- ncdim_def("snow_ice_dim",units = "",vals = c(1, 2, 3), longname = 'snow ice dims') 
   qt_update_days_dim <- ncdim_def("qt_update_days",units = '', vals = qt_update_days, longname = 'Number of running days that qt smooths over')
-  mixing_restart_vars_dim <- ncdim_def("mixing_restart_vars_dim",units = '', vals = mixing_restart_vars, longname = 'number of mixing restart variables')
+  # mixing_restart_vars_dim <- ncdim_def("mixing_restart_vars_dim",units = '', vals = mixing_restart_vars, longname = 'number of mixing restart variables')
   
   if(include_wq){
     phyto_restart_dim <- ncdim_def("phyto_restart_dim",units = "",vals = phytos_restart, longname = 'phyto_restart_dim') 
@@ -95,15 +96,15 @@ write_forecast_netcdf <- function(x,
   def_list[[11]] <- ncvar_def("snow_ice_restart","m",list(ensdim, snow_ice_dim),missval = -99,longname = 'Snow (1), White Ice (2), Blue Ice (3)',prec="single")
   def_list[[12]] <- ncvar_def("ice_thickness","m", list(timedim,ensdim),missval = -99,longname = 'Ice Thickness',prec="single")
   def_list[[13]] <- ncvar_def("lake_depth","m",list(timedim,ensdim),missval = -99,longname = 'Depth of lake',prec="single")
-  def_list[[14]] <- ncvar_def("avg_surf_temp_restart","deg_C",list(ensdim),missval = -99,longname ='Running Average of Surface Temperature',prec="single")
-  def_list[[15]] <- ncvar_def("running_residuals","various",list(qt_update_days_dim,statedim),fillvalue,longname = "running residual for updating qt",prec="single")
-  def_list[[16]] <- ncvar_def("mixing_restart","various",list(ensdim,mixing_restart_vars_dim),fillvalue,longname = "variables required to restart mixing",prec="single")
+  # def_list[[14]] <- ncvar_def("avg_surf_temp_restart","deg_C",list(ensdim),missval = -99,longname ='Running Average of Surface Temperature',prec="single")
+  def_list[[14]] <- ncvar_def("running_residuals","various",list(qt_update_days_dim,statedim),fillvalue,longname = "running residual for updating qt",prec="single")
+  # def_list[[16]] <- ncvar_def("mixing_restart","various",list(ensdim,mixing_restart_vars_dim),fillvalue,longname = "variables required to restart mixing",prec="single")
   
-    if(include_wq){
-    index <- 17
+  if(include_wq){
+    index <- length(def_list)+1
     def_list[[index]] <- ncvar_def("phyto_restart","mmol/m3",list(ensdim,phyto_restart_dim),missval = -99,longname ='Restart Phyto biomass',prec="single")
   }else{
-    index <- 16
+    index <- length(def_list)
   }
   if(npars > 0){
     for(par in 1:npars){
@@ -150,14 +151,14 @@ write_forecast_netcdf <- function(x,
   ncvar_put(ncout,def_list[[11]] ,snow_ice_restart)
   ncvar_put(ncout,def_list[[12]] ,ice_thickness)
   ncvar_put(ncout,def_list[[13]] ,surface_height)
-  ncvar_put(ncout,def_list[[14]] ,avg_surf_temp_restart)
-  ncvar_put(ncout,def_list[[15]] ,running_residuals)
-  ncvar_put(ncout,def_list[[16]] ,mixing_restart)
+  # ncvar_put(ncout,def_list[[14]] ,avg_surf_temp_restart)
+  ncvar_put(ncout,def_list[[14]] ,running_residuals)
+  # ncvar_put(ncout,def_list[[16]] ,mixing_restart)
   if(include_wq){
     index <- 17
     ncvar_put(ncout,def_list[[index]] ,x_phyto_groups_restart)
   }else{
-    index <- 16
+    index <- 14
   }
   
   if(npars > 0){

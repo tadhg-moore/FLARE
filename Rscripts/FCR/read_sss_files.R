@@ -6,7 +6,7 @@ read_sss_files <-  function(full_time_day_local,
   
   d <- read.csv(sss_file)
   
-  TIMESTAMP_in <- as.POSIXct(d$time, 
+  TIMESTAMP_in <- as.POSIXct(d[,1], 
                              format= "%Y-%m-%d",
                              tz = input_file_tz)
   

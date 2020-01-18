@@ -1,9 +1,9 @@
 #missing noaa files 
 #20181221gep_all_00z.csv to 20181229gep_all_00z.csv
 
-do_step_1 <- TRUE
+do_step_1 <- FALSE
 do_step_2 <- TRUE
-do_step_3 <- FALSE
+do_step_3 <- TRUE
 ###Step 0 ####################
 #Load required elements
 
@@ -24,20 +24,23 @@ library(imputeTS)
 library(tidyverse)
 library(tools)
 
-data_location <<- "/Users/quinn/Dropbox/Research/SSC_forecasting/SCC_data/"
-code_folder <<- "/Users/quinn/Dropbox/Research/SSC_forecasting/FLARE/"
-forecast_location <<- "/Users/quinn/Dropbox/Research/SSC_forecasting/flare_first_paper_revision/model_output/"
-execute_location <<- "/Volumes/ramdisk/revisions/"
+data_location <<- "C:\\Users\\mooret\\Desktop\\flare_feeagh\\fcr_data"
+code_folder <<- "C:\\Users\\mooret\\Desktop\\flare_feeagh\\FLARE_gotm/"
+forecast_location <<- "C:\\Users\\mooret\\Desktop\\flare_feeagh\\gotm_fc1/"
+execute_location <<- "C:\\Users\\mooret\\Desktop\\flare_feeagh\\FLARE_gotm\\gotm\\windows/"
+
+file.copy(paste0(code_folder, 'configure_FLARE-gotm.R'), paste0(forecast_location, 'configure_FLARE.R'), overwrite = T)
 
 source(paste0(forecast_location,"/","configure_FLARE.R"))
 source(paste0(code_folder, "/", "Rscripts/run_flare.R"))
+source(paste0(code_folder, "/", "Rscripts/run_EnKF.R"))
 source(paste0(code_folder, "/", "Rscripts/plot_forecast.R"))
 
 spin_up_days <- 0
 
-start_day <- as_date("2018-07-12")
-forecast_start<- as_date("2018-08-27")
-start_time_local <-"07:00:00"
+start_day <- as_date("2019-01-01")
+forecast_start<- as_date("2019-04-30")
+start_time_local <-"13:00:00"
 holder1 <- start_day
 holder2 <- forecast_start
 while(forecast_start < as_date("2019-11-01")){
@@ -58,8 +61,8 @@ forecast_days_vector[1] <- 0
 forecasting_timings <- data.frame(holder1,holder2,forecast_days_vector)
 
 start_time_local <- "07:00:00"
-partition_dates <- as.POSIXct(c("2018-09-24","2018-10-01","2018-11-01", "2018-12-01"), format = "%Y-%m-%d")
-partition_dates <- as_date(c("2018-08-27","2018-09-03"))
+# partition_dates <- as.POSIXct(c("2019-09-24","2019-10-01","2019-11-01", "2019-12-01"), format = "%Y-%m-%d")
+partition_dates <- as_date(c("2019-05-01","2019-05-14","2019-06-01","2019-06-14","2019-07-01","2019-07-14","2019-08-01","2019-08-14","2019-09-01","2019-09-14","2019-10-01","2019-10-14"))
 partition_restart_files <- rep(NA, length(partition_dates))
 
 sim_name_list <- c('FLARE1_ALL_UNCERT',
@@ -85,7 +88,7 @@ uncert_mode_list <- c(1,
 #RUN FROM JANUARY 1, 2018 to AUGUS
 if(do_step_1){
   
-  sim_name <- 'FLARE1_SPIN_UP'
+  sim_name <- 'FLARE2_SPIN_UP'
   start_day_local <-  as_date(forecasting_timings[1,1])
   
   forecast_start_day_local <- as_date(forecasting_timings[1,2])
@@ -117,7 +120,7 @@ if(do_step_1){
                    uncert_mode = uncert_mode,
                    cov_matrix = cov_matrix,
                    downscaling_coeff = downscaling_coeff,
-                   GLMversion = GLMversion,
+                   model_version = model_version,
                    DOWNSCALE_MET = DOWNSCALE_MET,
                    FLAREversion = FLAREversion,
                    met_ds_obs_start = met_ds_obs_start,
@@ -148,7 +151,8 @@ if(do_step_1){
 if(do_step_2){
   
   load(file = paste0(forecast_location,"/step1_out.Rdata"))
-  restart_file <- step1_out
+  # restart_file <- step1_out
+  restart_file = "C:\\Users\\mooret\\Desktop\\flare_feeagh\\gotm_fc1/FLARE1_FOR_H_2019_01_01_2019_04_30_F_0_1172020_11_47.nc"
   sim_name <- 'FLARE1_FOR'
   
   for(i in 2:nrow(forecasting_timings)){  
@@ -184,7 +188,7 @@ if(do_step_2){
                      uncert_mode = uncert_mode,
                      cov_matrix = cov_matrix,
                      downscaling_coeff = downscaling_coeff,
-                     GLMversion = GLMversion,
+                     model_version = model_version,
                      DOWNSCALE_MET = DOWNSCALE_MET,
                      FLAREversion = FLAREversion,
                      met_ds_obs_start = met_ds_obs_start,
@@ -222,8 +226,8 @@ if(do_step_3){
   load(paste0(forecast_location,"/partition_restart_files.Rdata"))
   source(paste0(forecast_location,"/","configure_FLARE.R"))
   
-  #for(i in 1:length(partition_dates)){
-    for(i in 1:1){
+  for(i in 1:length(partition_dates)){
+    # for(i in 1:1){
     
     hist_days <- 6
     start_day_local <- partition_dates[i]

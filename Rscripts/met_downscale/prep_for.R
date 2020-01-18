@@ -14,8 +14,9 @@ prep_for <- function(NOAA.data, input_tz, local_tzone, weather_uncertainty){
                   LongWave = ifelse(dlwrfsfc==NOAA.na.value, NA, dlwrfsfc),
                   ShortWave = ifelse(dswrfsfc==NOAA.na.value, NA, dswrfsfc),
                   RelHum = rh2m,
+                  airp = pressfc,
                   Rain = pratesfc*60*60*24/1000) %>% # (convert from mm/s to total m over 6 hrs)
-    select(NOAA.member, timestamp, AirTemp, LongWave, ShortWave, RelHum, WindSpeed, Rain)
+    select(NOAA.member, timestamp, AirTemp, LongWave, ShortWave, RelHum, airp, WindSpeed, Rain)
   forecast.data$timestamp <- with_tz(forecast.data$timestamp, local_tzone)
   
   if(weather_uncertainty == FALSE){
@@ -24,7 +25,8 @@ prep_for <- function(NOAA.data, input_tz, local_tzone, weather_uncertainty){
       mutate(AirTemp = mean(AirTemp), 
              LongWave = mean(LongWave), 
              ShortWave = mean(ShortWave), 
-             RelHum = mean(RelHum), 
+             RelHum = mean(RelHum),
+             airp = mean(airp),
              WindSpeed = mean(WindSpeed), 
              Rain = mean(Rain)) %>% 
      ungroup(timestamp)

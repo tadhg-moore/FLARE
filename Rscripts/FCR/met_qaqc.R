@@ -48,13 +48,15 @@ met_qaqc <- function(fname, cleaned_met_file,input_file_tz,local_tzone,working_d
     
     d1$TIMESTAMP <- with_tz(TIMESTAMP_in,tz = local_tzone)
     
-    d <- data.frame(timestamp = d1$TIMESTAMP, ShortWave = d1$SR01Up_Avg, LongWave = d1$IR01UpCo_Avg, AirTemp = d1$AirTC_Avg, RelHum = d1$RH, WindSpeed = d1$WS_ms_Avg, Rain = d1$Rain_mm_Tot)
+    d <- data.frame(timestamp = d1$TIMESTAMP, ShortWave = d1$SR01Up_Avg, LongWave = d1$IR01UpCo_Avg, AirTemp = d1$AirTC_Avg, RelHum = d1$RH, airp = d1$BP_kPa_Avg, WindSpeed = d1$WS_ms_Avg, Rain = d1$Rain_mm_Tot)
   }
   
   
   wshgt <- 3
   roughlength <- 0.000114
   d$WindSpeed <- d$WindSpeed * log(10.00 / 0.000114) / log(wshgt / 0.000114)
+  
+  d$airp <- d$airp * 100 #Convert to pascals
 
   maxTempC = 41 # an upper bound of realistic temperature for the study site in deg C
   minTempC = -24 # an lower bound of realistic temperature for the study site in deg C
@@ -65,6 +67,7 @@ met_qaqc <- function(fname, cleaned_met_file,input_file_tz,local_tzone,working_d
                   RelHum = ifelse(RelHum > 100, 100, RelHum),
                   AirTemp = ifelse(AirTemp> maxTempC, NA, AirTemp),
                   AirTemp = ifelse(AirTemp < minTempC, NA, AirTemp),
+                  airp = ifelse(airp < 9800, NA, airp),
                   LongWave = ifelse(LongWave < 0, NA, LongWave),
                   WindSpeed = ifelse(WindSpeed < 0, 0, WindSpeed)) %>%
     filter(is.na(timestamp) == FALSE)

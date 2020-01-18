@@ -38,7 +38,7 @@ run_flare<-function(start_day_local,
                     #reference_tzone,
                     cov_matrix = NA,
                     downscaling_coeff = NA,
-                    GLMversion,
+                    model_version,
                     DOWNSCALE_MET = TRUE,
                     FLAREversion,
                     met_ds_obs_start,
@@ -50,7 +50,14 @@ run_flare<-function(start_day_local,
   ### LOAD R FUNCTIONS AND OTHER INITIAL SET UP
   #################################################
   
-  source(paste0(code_folder,"/","Rscripts/edit_nml_functions.R"))
+  # Load GOTM functions
+  source(paste0(code_folder, "/", "Rscripts/gotm/set_met_cols_yaml.R"))
+  source(paste0(code_folder, "/", "Rscripts/gotm/input_yaml.R"))
+  source(paste0(code_folder, "/", "Rscripts/gotm/update_gotm_met_file_var.R"))
+  source(paste0(code_folder, "/", "Rscripts/gotm/get_gotm_nc_var_all_wq.R"))
+  source(paste0(code_folder, "/", "Rscripts/gotm/add_extra_day.R"))
+  
+  # source(paste0(code_folder,"/","Rscripts/edit_nml_functions.R"))
   source(paste0(code_folder,"/","Rscripts/archive_forecast.R"))
   source(paste0(code_folder,"/","Rscripts/write_forecast_netcdf.R")) 
   source(paste0(code_folder,"/","Rscripts/run_EnKF.R")) 
@@ -327,7 +334,7 @@ run_flare<-function(start_day_local,
   
   noaa_hour <- NA
   if(!hour(forecast_start_time_GMT) %in% c(0,6,12,18) & forecast_days > 0){
-    stop(paste0("local_start_datetime of ", local_start_datetime," does not have a corresponding GMT time with a NOAA forecast
+    stop(paste0("local_start_datetime of ", start_datetime_local," does not have a corresponding GMT time with a NOAA forecast
                 The GMT times that are avialable are 00:00:00, 06:00:00, 12:00:00, and 18:00:00"))
   }else{
     if(hour(forecast_start_time_GMT) == 0){
@@ -384,6 +391,11 @@ run_flare<-function(start_day_local,
                                          tz = local_tzone), 
                               as.POSIXct(full_time_local[length(full_time_local)],
                                          tz = local_tzone),
+                              by = "1 hour")
+  full_time_hour_GMT <- seq(as.POSIXct(full_time_GMT[1],
+                                         tz = 'GMT'), 
+                              as.POSIXct(full_time_GMT[length(full_time_GMT)],
+                                         tz = 'GMT'),
                               by = "1 hour")
   
   ####################################################
@@ -477,7 +489,7 @@ run_flare<-function(start_day_local,
   ####################################################
   
   met_file_names <- rep(NA, 1+(n_met_members*n_ds_members))
-  obs_met_outfile <- "GLM_met.csv"
+  obs_met_outfile <- "GOTM_met.dat" # GOTM file name
   
   cleaned_met_file <- paste0(working_directory, "/FCRMet_postQAQC.csv")
   met_qaqc(fname = met_obs_fname,
@@ -489,10 +501,14 @@ run_flare<-function(start_day_local,
   
   missing_met <- create_obs_met_input(fname = met_obs_fname_wdir,
                                       outfile=obs_met_outfile,
-                                      full_time_hour_local, 
+                                      full_time_hour_local,
+                                      full_time_hour_GMT, 
                                       local_tzone,
                                       working_directory,
                                       hist_days)
+  set_met_cols_yaml(obs_met_outfile, working_directory)
+  
+  # Set column names in yaml file
   
   if(missing_met  == FALSE){
     met_file_names[1] <- obs_met_outfile
@@ -507,16 +523,19 @@ run_flare<-function(start_day_local,
     VarInfo <- data.frame("VarNames" = c("AirTemp",
                                          "WindSpeed",
                                          "RelHum",
+                                         "airp",
                                          "ShortWave",
                                          "LongWave",
                                          "Rain"),
                           "VarType" = c("State",
                                         "State",
                                         "State",
+                                        "State",
                                         "Flux",
                                         "Flux",
                                         "Flux"),
                           "ds_res" = c("hour",
+                                       "hour",
                                        "hour",
                                        "hour",
                                        "hour",
@@ -527,9 +546,11 @@ run_flare<-function(start_day_local,
                                               "lm",
                                               "lm",
                                               "lm",
+                                              "lm",
                                               "compare_totals"),
                           "use_covariance" = c(TRUE,
                                                FALSE,
+                                               TRUE,
                                                TRUE,
                                                TRUE,
                                                TRUE,
@@ -577,16 +598,19 @@ run_flare<-function(start_day_local,
     VarInfo <- data.frame("VarNames" = c("AirTemp",
                                          "WindSpeed",
                                          "RelHum",
+                                         "airp",
                                          "ShortWave",
                                          "LongWave",
                                          "Rain"),
                           "VarType" = c("State",
                                         "State",
                                         "State",
+                                        "State",
                                         "Flux",
                                         "Flux",
                                         "Flux"),
                           "ds_res" = c("hour",
+                                       "hour",
                                        "hour",
                                        "hour",
                                        "hour",
@@ -597,8 +621,10 @@ run_flare<-function(start_day_local,
                                               "lm",
                                               "lm",
                                               "lm",
+                                              "lm",
                                               "compare_totals"),
                           "use_covariance" = c(TRUE,
+                                               TRUE,
                                                TRUE,
                                                TRUE,
                                                TRUE,
@@ -609,13 +635,14 @@ run_flare<-function(start_day_local,
     replaceObsNames <- c("AirTemp" = "AirTemp",
                          "WindSpeed" = "WindSpeed",
                          "RelHum" = "RelHum",
+                         "airp" = "airp",
                          "ShortWave" = "ShortWave",
                          "LongWave" = "LongWave",
                          "Rain" = "Rain")
     
     met_file_names[2:(1+(n_met_members*n_ds_members))] <- process_downscale_GEFS(folder = code_folder,
                                                                                  noaa_location,
-                                                                                 input_met_file = "C:\\Users\\mooret\\Desktop\\flare_feeagh\\feeagh_data\\met/GLM_met_obs.csv",#met_obs_fname_wdir[1],
+                                                                                 input_met_file = met_obs_fname_wdir,
                                                                                  working_directory,
                                                                                  sim_files_folder = paste0(code_folder, "/", "sim_files"),
                                                                                  n_ds_members,
@@ -635,7 +662,7 @@ run_flare<-function(start_day_local,
                                                                                  input_met_file_tz = local_tzone,
                                                                                  weather_uncertainty)
     
-     if(weather_uncertainty == FALSE & met_downscale_uncertainty == TRUE){
+    if(weather_uncertainty == FALSE & met_downscale_uncertainty == TRUE){
       met_file_names <- met_file_names[1:(1+(1*n_ds_members))]
     }else if(weather_uncertainty == FALSE & met_downscale_uncertainty == FALSE){
       met_file_names <- met_file_names[1:2]
@@ -707,7 +734,7 @@ run_flare<-function(start_day_local,
   
   
   ##CREATE INFLOW AND OUTFILE FILES
-  inflow_outflow_files <- create_inflow_outflow_file(full_time_day_local,
+  inflow_outflow_files <- create_inflow_outflow_file(full_time_day_GMT,
                                                      working_directory, 
                                                      input_file_tz = "EST",
                                                      start_forecast_step,
@@ -729,6 +756,7 @@ run_flare<-function(start_day_local,
                                      sss_file = sss_fname,
                                      local_tzone)
   
+  
   ####################################################
   #### STEP 6: PROCESS AND ORGANIZE STATE DATA
   ####################################################
@@ -749,11 +777,23 @@ run_flare<-function(start_day_local,
   
   #PROCESS TEMPERATURE OBSERVATIONS
   obs_temp <- extract_temp_chain(fname = new_temp_obs_fname_wdir,
-                                 full_time_local,
+                                 full_time_GMT,
                                  modeled_depths = modeled_depths,
                                  observed_depths_temp = observed_depths_temp,
                                  input_file_tz = "EST5EDT",
                                  local_tzone)
+  
+  #Plot of observed data
+  png(paste0(forecast_location, 'obs_temp.png'), width = 1600, height = 900, res = 120)
+  plot(full_time_GMT, obs_temp$obs[,1], type = 'p', main = 'Obs_temp extracted', pch = 16, cex = 0.4, xlim = range(as.POSIXct(full_time_GMT, tz = 'GMT')), ylim = c(0,30))
+  points(full_time_GMT, obs_temp$obs[,ncol(obs_temp$obs)], col =2, pch = 16, cex = 0.4)
+  dev.off()
+  
+  #write obs df
+  df = data.frame(DateTime = full_time_GMT)
+  df <- cbind(df, obs_temp$obs)
+  colnames(df) <- c('DateTime', paste0('wtr_', modeled_depths))
+  write.csv(df, paste0(forecast_location, 'obs_temp_GMT.csv'), row.names = FALSE)
   
   if(include_wq){
     #PROCESS DO OBSERVATIONS
@@ -1054,27 +1094,48 @@ run_flare<-function(start_day_local,
   ########################################
   #BEGIN GLM SPECIFIC PART
   ########################################
-  
-  GLM_folder <- paste0(code_folder, "/", "glm", "/", machine) 
-  fl <- c(list.files(GLM_folder, full.names = TRUE))
-  tmp <- file.copy(from = fl, to = working_directory, overwrite = TRUE)
-  
-  file.copy(from = paste0(working_directory, "/", base_GLM_nml), 
-            to = paste0(working_directory, "/", "glm3.nml"), overwrite = TRUE)
-  
-  #update_var(wq_init_vals, "wq_init_vals", working_directory, "glm3.nml") #GLM SPECIFIC
-  if(include_wq){
-    update_var(num_wq_vars - 1 + length(tchla_components_vars), "num_wq_vars", working_directory, "glm3.nml") #GLM SPECIFIC
-  }else{
-    update_var(0, "num_wq_vars", working_directory, "glm3.nml") #GLM SPECIFIC
+  if(lake_model == 'GLM'){
+    GLM_folder <- paste0(code_folder, "/", "glm", "/", machine) 
+    fl <- c(list.files(GLM_folder, full.names = TRUE))
+    tmp <- file.copy(from = fl, to = working_directory, overwrite = TRUE)
+    
+    file.copy(from = paste0(working_directory, "/", base_GLM_nml), 
+              to = paste0(working_directory, "/", "glm3.nml"), overwrite = TRUE)
+    
+    #update_var(wq_init_vals, "wq_init_vals", working_directory, "glm3.nml") #GLM SPECIFIC
+    if(include_wq){
+      update_var(num_wq_vars - 1 + length(tchla_components_vars), "num_wq_vars", working_directory, "glm3.nml") #GLM SPECIFIC
+    }else{
+      update_var(0, "num_wq_vars", working_directory, "glm3.nml") #GLM SPECIFIC
+    }
+    update_var(ndepths_modeled, "num_depths", working_directory, "glm3.nml") #GLM SPECIFIC
+    update_var(modeled_depths, "the_depths", working_directory, "glm3.nml") #GLM SPECIFIC
+    update_var(rep(the_sals_init, ndepths_modeled), "the_sals", working_directory, "glm3.nml") #GLM SPECIFIC
+    
+    #Create a copy of the NML to record starting initial conditions
+    file.copy(from = paste0(working_directory, "/", "glm3.nml"), #GLM SPECIFIC
+              to = paste0(working_directory, "/", "glm3_initial.nml"), overwrite = TRUE) #GLM SPECIFIC
+    
+  }else if(lake_model == 'GOTM'){
+    
+    GOTM_folder <- paste0(code_folder, "/", "gotm", "/", machine) 
+    fl <- c(list.files(GOTM_folder, full.names = TRUE))
+    tmp <- file.copy(from = fl, to = working_directory, overwrite = TRUE)
+    
+    file.copy(from = paste0(working_directory, "/", base_GOTM_yaml), 
+              to = paste0(working_directory, "/", "gotm.yaml"), overwrite = TRUE)
+    
+    #update_var(wq_init_vals, "wq_init_vals", working_directory, "gotm.yaml") #GOTM SPECIFIC
+    if(include_wq){
+      input_yaml(file = file.path(working_directory, 'gotm.yaml'), label = 'fabm', key = 'use', value = 'true')
+    }else{
+      input_yaml(file = file.path(working_directory, 'gotm.yaml'), label = 'fabm', key = 'use', value = 'false') #GOTM SPECIFIC
+    }
+    
+    #Create a copy of the NML to record starting initial conditions
+    file.copy(from = paste0(working_directory, "/", "gotm.yaml"), #GOTM SPECIFIC
+              to = paste0(working_directory, "/", "gotm_initial.yaml"), overwrite = TRUE) #GOTM SPECIFIC
   }
-  update_var(ndepths_modeled, "num_depths", working_directory, "glm3.nml") #GLM SPECIFIC
-  update_var(modeled_depths, "the_depths", working_directory, "glm3.nml") #GLM SPECIFIC
-  update_var(rep(the_sals_init, ndepths_modeled), "the_sals", working_directory, "glm3.nml") #GLM SPECIFIC
-  
-  #Create a copy of the NML to record starting initial conditions
-  file.copy(from = paste0(working_directory, "/", "glm3.nml"), #GLM SPECIFIC
-            to = paste0(working_directory, "/", "glm3_initial.nml"), overwrite = TRUE) #GLM SPECIFIC
   
   ########################################
   #END GLM SPECIFIC PART
@@ -1255,7 +1316,11 @@ run_flare<-function(start_day_local,
         }
         
         for(par in 1:npars){
-          x[1, ,(nstates+par)] <- runif(n=nmembers,par_init_lowerbound[par], par_init_upperbound[par])
+          if(par_log[par]){
+            x[1, ,(nstates+par)] <- KScorrect::rlunif(n=nmembers,par_init_lowerbound[par], par_init_upperbound[par], base = exp(10))
+          }else{
+            x[1, ,(nstates+par)] <- runif(n=nmembers,par_init_lowerbound[par], par_init_upperbound[par])
+          }
           if(single_run){
             x[1, ,(nstates+par)] <-  rep(par_init_mean[par], nmembers)
           }
@@ -1386,8 +1451,8 @@ run_flare<-function(start_day_local,
     restart_nmembers <- length(ncvar_get(nc, "ens"))
     surface_height_restart <- ncvar_get(nc, "surface_height_restart")
     snow_ice_thickness_restart <- ncvar_get(nc, "snow_ice_restart")
-    avg_surf_temp_restart <- ncvar_get(nc, "avg_surf_temp_restart")
-    mixing_restart <- ncvar_get(nc, "mixing_restart")
+    # avg_surf_temp_restart <- ncvar_get(nc, "avg_surf_temp_restart")
+    # mixing_restart <- ncvar_get(nc, "mixing_restart")
     
     if(include_wq){
       x_phyto_groups_restart <- ncvar_get(nc, "phyto_restart")
@@ -1405,8 +1470,8 @@ run_flare<-function(start_day_local,
       snow_ice_thickness[1, , 3] <- snow_ice_thickness_restart[sampled_nmembers, 3]
       
       surface_height[1, ] <- surface_height_restart[sampled_nmembers]
-      avg_surf_temp[1, ] <- avg_surf_temp_restart[sampled_nmembers]
-      mixing_vars <- mixing_restart[sampled_nmembers, ]
+      # avg_surf_temp[1, ] <- avg_surf_temp_restart[sampled_nmembers]
+      # mixing_vars <- mixing_restart[sampled_nmembers, ]
       
       if(include_wq){
         for(phyto in 1:num_phytos){
@@ -1426,8 +1491,8 @@ run_flare<-function(start_day_local,
       snow_ice_thickness[1, ,3] <- snow_ice_thickness_restart[sampled_nmembers, 3]
       
       surface_height[1, ] <- surface_height_restart[sampled_nmembers]
-      avg_surf_temp[1, ] <- avg_surf_temp_restart[sampled_nmembers]
-      mixing_vars <- mixing_restart[sampled_nmembers, ]
+      # avg_surf_temp[1, ] <- avg_surf_temp_restart[sampled_nmembers]
+      # mixing_vars <- mixing_restart[sampled_nmembers, ]
       
       if(include_wq){
         for(phyto in 1:num_phytos){
@@ -1443,8 +1508,8 @@ run_flare<-function(start_day_local,
       snow_ice_thickness[1, ,3] <- snow_ice_thickness_restart[, 3]
       
       surface_height[1, ] <- surface_height_restart
-      avg_surf_temp[1, ] <- avg_surf_temp_restart
-      mixing_vars <- mixing_restart
+      # avg_surf_temp[1, ] <- avg_surf_temp_restart
+      # mixing_vars <- mixing_restart
       
       if(include_wq){
         for(phyto in 1:num_phytos){
@@ -1496,6 +1561,11 @@ run_flare<-function(start_day_local,
     }
   }
   
+  # Ensure reduced number of digits for GOTM
+  if(lake_model == 'GOTM'){
+    x <- signif(x)
+  }
+  
   
   
   ####################################################
@@ -1508,7 +1578,7 @@ run_flare<-function(start_day_local,
                           qt_pars,
                           psi_slope,
                           psi_intercept,
-                          full_time_local,
+                          full_time_GMT,
                           working_directory,
                           npars,
                           modeled_depths,
@@ -1525,7 +1595,7 @@ run_flare<-function(start_day_local,
                           parameter_uncertainty,
                           machine,
                           hist_days,
-                          print_glm2screen,
+                          print2screen,
                           x_phyto_groups,
                           inflow_file_names,
                           outflow_file_names,
@@ -1551,8 +1621,10 @@ run_flare<-function(start_day_local,
   x_phyto_groups <- enkf_output$x_phyto_groups
   running_residuals <- enkf_output$running_residuals
   
-  avg_surf_temp_restart <- enkf_output$avg_surf_temp_restart
-  mixing_restart <- enkf_output$mixing_restart
+  # avg_surf_temp_restart <- enkf_output$avg_surf_temp_restart
+  # mixing_restart <- enkf_output$mixing_restart
+  avg_surf_temp_restart <-NA
+  mixing_restart <- NA
   
   ####################################################
   #### STEP 13: PROCESS OUTPUT
@@ -1615,18 +1687,19 @@ run_flare<-function(start_day_local,
                         z,
                         nstates,
                         npars,
-                        GLMversion,
+                        model_version,
                         FLAREversion,
                         local_tzone,
                         surface_height_restart,
                         snow_ice_restart,
                         snow_ice_thickness,
                         surface_height,
-                        avg_surf_temp_restart,
+                        # avg_surf_temp_restart,
                         x_phyto_groups_restart,
                         x_phyto_groups,
-                        running_residuals,
-                        mixing_restart)
+                        running_residuals#,
+                        # mixing_restart
+                        )
   
   ##ARCHIVE FORECAST
   restart_file_name <- archive_forecast(working_directory = working_directory,
