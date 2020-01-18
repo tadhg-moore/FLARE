@@ -77,8 +77,8 @@ if(include_wq){
     base_GLM_nml <<- "glm3_wAED.nml"  
   }
 }else{
-  #base_GLM_nml <<- "glm3_woAED.nml"
-  base_GLM_nml <<- "glm3_woAED_constant_sedtemp_hotmixing.nml"
+  base_GLM_nml <<- "glm3_woAED.nml"
+  # base_GLM_nml <<- "glm3_woAED_constant_sedtemp_hotmixing.nml"
 }
 
 #################################
@@ -532,12 +532,12 @@ observed_depths_do <<- c(1, 5, 9)
 observed_depths_chla_fdom <<- 1
 #Depths with Chla and fdom observations
 
-temp_obs_fname <<- c(paste0(data_location,"/mia-data/Catwalk.csv"),paste0(data_location, "/manual-data/Catwalk_cleanedEDI.csv"))
+temp_obs_fname <<- c(paste0(data_location,"/mia-data/Catwalk.csv"))#,paste0(data_location, "/manual-data/Catwalk_cleanedEDI.csv"))
 #temp_obs_fname <<- paste0(data_location,"/mia-data/Catwalk.csv")
 #name of catwalk file name
 #Catwalk has the temperature string, fdom, chla, and do sensors
 
-met_obs_fname <<- c(paste0(data_location,"/carina-data/FCRmet.csv"),paste0(data_location, "/manual-data/Met_final_2015_2018.csv"))
+met_obs_fname <<- c(paste0(data_location,"/carina-data/FCRmet.csv"))#,paste0(data_location, "/manual-data/Met_final_2015_2018.csv"))
 #met_obs_fname <<- c(paste0(data_location,"/carina-data/FCRmet.csv"))
 #Name of meteorology file name
 #2013 - dec 2018

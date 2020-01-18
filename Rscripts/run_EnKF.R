@@ -92,13 +92,13 @@ run_EnKF <- function(x,
       }
     }
     
-    mixing_restart_variables <- c("dep_mx_init","prev_thick_init", "g_prime_two_layer_init", "energy_avail_max_init", "mass_epi_init", 
-                                  "old_slope_init", "time_end_shear_init", "time_start_shear_init", "time_count_end_shear_init", "time_count_sim_init", 
-                                  "half_seiche_period_init", "thermocline_height_init", "f0_init", "fsum_init", "u_f_init", "u0_init", "u_avg_init")
-    
-    for(v in 1:length(mixing_restart_variables)){
-      update_var(mean(mixing_vars[ ,v]), mixing_restart_variables[v], working_directory, "glm3.nml") 
-    }
+    # mixing_restart_variables <- c("dep_mx_init","prev_thick_init", "g_prime_two_layer_init", "energy_avail_max_init", "mass_epi_init",
+    #                               "old_slope_init", "time_end_shear_init", "time_start_shear_init", "time_count_end_shear_init", "time_count_sim_init",
+    #                               "half_seiche_period_init", "thermocline_height_init", "f0_init", "fsum_init", "u_f_init", "u0_init", "u_avg_init")
+    # 
+    # for(v in 1:length(mixing_restart_variables)){
+    #   update_var(mean(mixing_vars[ ,v]), mixing_restart_variables[v], working_directory, "glm3.nml")
+    # }
     
     update_var(curr_start, "start", working_directory, "glm3.nml")
     update_var(curr_stop, "stop", working_directory, "glm3.nml")
@@ -116,9 +116,6 @@ run_EnKF <- function(x,
         curr_pars <- x[i - 1, m , (nstates+1):(nstates+npars)]
       }
       
-      #Remove double backslash in windows
-      curr_met_file <- gsub("\\", "/", curr_met_file, fixed = T)
-     
       ########################################
       #BEGIN GLM SPECIFIC PART
       ########################################
@@ -185,21 +182,21 @@ run_EnKF <- function(x,
       update_glm_nml_names[list_index] <- "lake_depth"
       list_index <- list_index + 1
       
-      update_glm_nml_list[[list_index]] <- 0.0
-      update_glm_nml_names[list_index] <- "snow_thickness"
-      list_index <- list_index + 1
-      
-      update_glm_nml_list[[list_index]] <- snow_ice_thickness[i - 1, m, 2]
-      update_glm_nml_names[list_index] <- "white_ice_thickness"
-      list_index <- list_index + 1
-      
-      update_glm_nml_list[[list_index]] <- snow_ice_thickness[i - 1, m, 3]
-      update_glm_nml_names[list_index] <- "blue_ice_thickness"
-      list_index <- list_index + 1
-      
-      update_glm_nml_list[[list_index]] <- avg_surf_temp[i - 1, m]
-      update_glm_nml_names[list_index] <- "avg_surf_temp"
-      list_index <- list_index + 1
+      # update_glm_nml_list[[list_index]] <- 0.0
+      # update_glm_nml_names[list_index] <- "snow_thickness"
+      # list_index <- list_index + 1
+      # 
+      # update_glm_nml_list[[list_index]] <- snow_ice_thickness[i - 1, m, 2]
+      # update_glm_nml_names[list_index] <- "white_ice_thickness"
+      # list_index <- list_index + 1
+      # 
+      # update_glm_nml_list[[list_index]] <- snow_ice_thickness[i - 1, m, 3]
+      # update_glm_nml_names[list_index] <- "blue_ice_thickness"
+      # list_index <- list_index + 1
+      # 
+      # update_glm_nml_list[[list_index]] <- avg_surf_temp[i - 1, m]
+      # update_glm_nml_names[list_index] <- "avg_surf_temp"
+      # list_index <- list_index + 1
 
       
       #ALLOWS THE LOOPING THROUGH NOAA ENSEMBLES
@@ -235,7 +232,7 @@ run_EnKF <- function(x,
         if(machine == "unix" | machine == "mac"){
           system2(paste0(working_directory, "/", "glm"), stdout = print_glm2screen, stderr = print_glm2screen)
         }else if(machine == "windows"){
-          system2(paste0(working_directory, "/", "glm.exe"), invisible = print_glm2screen)
+          system(paste0(working_directory, "/", "glm.exe"), ignore.stdout = TRUE, show.output.on.console = FALSE)
         }else{
           print("Machine not identified")
           stop()
@@ -263,9 +260,9 @@ run_EnKF <- function(x,
             
             snow_ice_thickness[i, m, ] <- round(GLM_temp_wq_out$snow_wice_bice, 3)
             
-            avg_surf_temp[i, m] <- round(GLM_temp_wq_out$avg_surf_temp, 3)
+            # avg_surf_temp[i, m] <- round(GLM_temp_wq_out$avg_surf_temp, 3)
             
-            mixing_vars[m, ] <- GLM_temp_wq_out$mixing_vars
+            # mixing_vars[m, ] <- GLM_temp_wq_out$mixing_vars
             
             if(include_wq){
               phyto_groups_star[m, , ] <- round(GLM_temp_wq_out$output[ , (length(glm_output_vars) + 1): (length(glm_output_vars)+ num_phytos)], 3)
@@ -645,7 +642,8 @@ run_EnKF <- function(x,
               snow_ice_restart = snow_ice_restart,
               snow_ice_thickness = snow_ice_thickness,
               surface_height = surface_height,
-              avg_surf_temp_restart = avg_surf_temp_restart,
-              running_residuals = running_residuals,
-              mixing_restart = mixing_restart))
+              # avg_surf_temp_restart = avg_surf_temp_restart,
+              running_residuals = running_residuals)#,
+              # mixing_restart = mixing_restart)
+  )
 }

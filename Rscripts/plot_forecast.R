@@ -111,19 +111,18 @@ plot_forecast <- function(pdf_file_name,
                                input_file_tz = "EST5EDT", 
                                local_tzone)
   
-  obs_nutrients <- extract_nutrients(fname = nutrients_fname,
-                                     full_time_day_local,
-                                     modeled_depths = modeled_depths,
-                                     input_file_tz = "EST5EDT", 
-                                     local_tzone)
+  # obs_nutrients <- extract_nutrients(fname = nutrients_fname,
+  #                                    full_time_day_local,
+  #                                    modeled_depths = modeled_depths,
+  #                                    input_file_tz = "EST5EDT", 
+  #                                    local_tzone)
   
   #Combine fdom and nutrients
-  for(i in 1:length(full_time_day_local)){
-    if(length(which(!is.na(obs_nutrients$DOC[i,]))) > 0){
-      obs_fdom$obs[i,which(is.na(obs_fdom$obs[i,]))] <- obs_nutrients$DOC[i,which(is.na(obs_fdom$obs[i,]))]
-    }
-  }
-  
+  # for(i in 1:length(full_time_day_local)){
+  #   if(length(which(!is.na(obs_nutrients$DOC[i,]))) > 0){
+  #     obs_fdom$obs[i,which(is.na(obs_fdom$obs[i,]))] <- obs_nutrients$DOC[i,which(is.na(obs_fdom$obs[i,]))]
+  #   }
+  # }
   
   #Use the CTD observation rather than the sensor string when CTD data is avialable
   if(use_ctd){

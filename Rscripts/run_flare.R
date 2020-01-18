@@ -480,7 +480,7 @@ run_flare<-function(start_day_local,
   obs_met_outfile <- "GLM_met.csv"
   
   cleaned_met_file <- paste0(working_directory, "/FCRMet_postQAQC.csv")
-  met_qaqc(fname = met_obs_fname,
+  met_qaqc(fname = met_obs_fname, #1  Error: 'C:\Users\mooret\Desktop\Git\feeagh-flare\data_location//manual-data/Met_final_2015_2018.csv' does not exist. - no cleaned files in 'manual-data'
            cleaned_met_file,
            input_file_tz = "EST",
            local_tzone)
@@ -615,7 +615,7 @@ run_flare<-function(start_day_local,
     
     met_file_names[2:(1+(n_met_members*n_ds_members))] <- process_downscale_GEFS(folder = code_folder,
                                                                                  noaa_location,
-                                                                                 input_met_file = "C:\\Users\\mooret\\Desktop\\flare_feeagh\\feeagh_data\\met/GLM_met_obs.csv",#met_obs_fname_wdir[1],
+                                                                                 input_met_file = met_obs_fname_wdir,
                                                                                  working_directory,
                                                                                  sim_files_folder = paste0(code_folder, "/", "sim_files"),
                                                                                  n_ds_members,
@@ -635,7 +635,7 @@ run_flare<-function(start_day_local,
                                                                                  input_met_file_tz = local_tzone,
                                                                                  weather_uncertainty)
     
-     if(weather_uncertainty == FALSE & met_downscale_uncertainty == TRUE){
+    if(weather_uncertainty == FALSE & met_downscale_uncertainty == TRUE){
       met_file_names <- met_file_names[1:(1+(1*n_ds_members))]
     }else if(weather_uncertainty == FALSE & met_downscale_uncertainty == FALSE){
       met_file_names <- met_file_names[1:2]
@@ -728,6 +728,7 @@ run_flare<-function(start_day_local,
                                      input_file_tz = 'EST5EDT', 
                                      sss_file = sss_fname,
                                      local_tzone)
+  
   
   ####################################################
   #### STEP 6: PROCESS AND ORGANIZE STATE DATA
@@ -1385,9 +1386,9 @@ run_flare<-function(start_day_local,
     nc <- nc_open(restart_file)
     restart_nmembers <- length(ncvar_get(nc, "ens"))
     surface_height_restart <- ncvar_get(nc, "surface_height_restart")
-    snow_ice_thickness_restart <- ncvar_get(nc, "snow_ice_restart")
-    avg_surf_temp_restart <- ncvar_get(nc, "avg_surf_temp_restart")
-    mixing_restart <- ncvar_get(nc, "mixing_restart")
+    # snow_ice_thickness_restart <- ncvar_get(nc, "snow_ice_restart")
+    # avg_surf_temp_restart <- ncvar_get(nc, "avg_surf_temp_restart")
+    # mixing_restart <- ncvar_get(nc, "mixing_restart")
     
     if(include_wq){
       x_phyto_groups_restart <- ncvar_get(nc, "phyto_restart")
@@ -1400,13 +1401,13 @@ run_flare<-function(start_day_local,
       restart_x_previous <- ncvar_get(nc, "x_restart")
       x_previous <- restart_x_previous[sampled_nmembers, ]
       
-      snow_ice_thickness[1, , 1] <- snow_ice_thickness_restart[sampled_nmembers, 1]
-      snow_ice_thickness[1, , 2] <- snow_ice_thickness_restart[sampled_nmembers, 2]
-      snow_ice_thickness[1, , 3] <- snow_ice_thickness_restart[sampled_nmembers, 3]
+      # snow_ice_thickness[1, , 1] <- snow_ice_thickness_restart[sampled_nmembers, 1]
+      # snow_ice_thickness[1, , 2] <- snow_ice_thickness_restart[sampled_nmembers, 2]
+      # snow_ice_thickness[1, , 3] <- snow_ice_thickness_restart[sampled_nmembers, 3]
       
       surface_height[1, ] <- surface_height_restart[sampled_nmembers]
-      avg_surf_temp[1, ] <- avg_surf_temp_restart[sampled_nmembers]
-      mixing_vars <- mixing_restart[sampled_nmembers, ]
+      # avg_surf_temp[1, ] <- avg_surf_temp_restart[sampled_nmembers]
+      # mixing_vars <- mixing_restart[sampled_nmembers, ]
       
       if(include_wq){
         for(phyto in 1:num_phytos){
@@ -1421,13 +1422,13 @@ run_flare<-function(start_day_local,
       restart_x_previous <- ncvar_get(nc, "x_restart")
       x_previous <- restart_x_previous[sampled_nmembers, ]
       
-      snow_ice_thickness[1, ,1] <- snow_ice_thickness_restart[sampled_nmembers, 1]
-      snow_ice_thickness[1, ,2] <- snow_ice_thickness_restart[sampled_nmembers, 2]
-      snow_ice_thickness[1, ,3] <- snow_ice_thickness_restart[sampled_nmembers, 3]
+      # snow_ice_thickness[1, ,1] <- snow_ice_thickness_restart[sampled_nmembers, 1]
+      # snow_ice_thickness[1, ,2] <- snow_ice_thickness_restart[sampled_nmembers, 2]
+      # snow_ice_thickness[1, ,3] <- snow_ice_thickness_restart[sampled_nmembers, 3]
       
       surface_height[1, ] <- surface_height_restart[sampled_nmembers]
-      avg_surf_temp[1, ] <- avg_surf_temp_restart[sampled_nmembers]
-      mixing_vars <- mixing_restart[sampled_nmembers, ]
+      # avg_surf_temp[1, ] <- avg_surf_temp_restart[sampled_nmembers]
+      # mixing_vars <- mixing_restart[sampled_nmembers, ]
       
       if(include_wq){
         for(phyto in 1:num_phytos){
@@ -1438,13 +1439,13 @@ run_flare<-function(start_day_local,
     }else{
       restart_x_previous <- ncvar_get(nc, "x_restart")
       x_previous <- restart_x_previous
-      snow_ice_thickness[1, ,1] <- snow_ice_thickness_restart[, 1]
-      snow_ice_thickness[1, ,2] <- snow_ice_thickness_restart[, 2]
-      snow_ice_thickness[1, ,3] <- snow_ice_thickness_restart[, 3]
+      # snow_ice_thickness[1, ,1] <- snow_ice_thickness_restart[, 1]
+      # snow_ice_thickness[1, ,2] <- snow_ice_thickness_restart[, 2]
+      # snow_ice_thickness[1, ,3] <- snow_ice_thickness_restart[, 3]
       
       surface_height[1, ] <- surface_height_restart
-      avg_surf_temp[1, ] <- avg_surf_temp_restart
-      mixing_vars <- mixing_restart
+      # avg_surf_temp[1, ] <- avg_surf_temp_restart
+      # mixing_vars <- mixing_restart
       
       if(include_wq){
         for(phyto in 1:num_phytos){
@@ -1464,13 +1465,13 @@ run_flare<-function(start_day_local,
     surface_height[1, ] <- round(lake_depth_init, 3)
     
     #Matrix to store snow and ice heights
-    snow_ice_thickness[1, ,1] <- default_snow_thickness_init
-    snow_ice_thickness[1, ,2] <- default_white_ice_thickness_init
-    snow_ice_thickness[1, ,3] <- default_blue_ice_thickness_init
+    # snow_ice_thickness[1, ,1] <- default_snow_thickness_init
+    # snow_ice_thickness[1, ,2] <- default_white_ice_thickness_init
+    # snow_ice_thickness[1, ,3] <- default_blue_ice_thickness_init
     
-    avg_surf_temp[1, ] <- x[1, ,1]
+    # avg_surf_temp[1, ] <- x[1, ,1]
     
-    mixing_vars[,] <- 0.0
+    # mixing_vars[,] <- 0.0
     
   }
   
@@ -1551,8 +1552,10 @@ run_flare<-function(start_day_local,
   x_phyto_groups <- enkf_output$x_phyto_groups
   running_residuals <- enkf_output$running_residuals
   
-  avg_surf_temp_restart <- enkf_output$avg_surf_temp_restart
-  mixing_restart <- enkf_output$mixing_restart
+  # avg_surf_temp_restart <- enkf_output$avg_surf_temp_restart
+  # mixing_restart <- enkf_output$mixing_restart
+  avg_surf_temp_restart <-NA
+  mixing_restart <- NA
   
   ####################################################
   #### STEP 13: PROCESS OUTPUT
@@ -1622,11 +1625,12 @@ run_flare<-function(start_day_local,
                         snow_ice_restart,
                         snow_ice_thickness,
                         surface_height,
-                        avg_surf_temp_restart,
+                        # avg_surf_temp_restart,
                         x_phyto_groups_restart,
                         x_phyto_groups,
-                        running_residuals,
-                        mixing_restart)
+                        running_residuals#,
+                        # mixing_restart
+                        )
   
   ##ARCHIVE FORECAST
   restart_file_name <- archive_forecast(working_directory = working_directory,
